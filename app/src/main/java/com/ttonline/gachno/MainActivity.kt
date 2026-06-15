@@ -83,6 +83,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
+        // --- Web link ---
+        binding.tvWebLink.setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://tt.thaydat.edu.vn")))
+        }
+
         // --- Webhook URL ---
         binding.etWebhookUrl.setText(settings.webhookUrl)
 

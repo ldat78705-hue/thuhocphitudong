@@ -4,6 +4,7 @@
     <color name="accent_primary">#1976D2</color>
     <color name="accent_primary_dark">#0D47A1</color>
     <color name="accent_secondary">#26A69A</color>
+    <color name="accent">#00ACC1</color>
 
     <!-- Background -->
     <color name="bg_primary">#F5F5F5</color>

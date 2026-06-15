@@ -34,18 +34,52 @@ jobs:
     - name: Build Debug APK
       run: gradle assembleDebug
 
+    - name: Build Release APK
+      run: gradle assembleRelease
+
+    - name: Rename APKs for clarity
+      run: |
+        mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/GachNo-v1.0.0-debug.apk || true
+        mv app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/GachNo-v1.0.0-release.apk || true
+
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: GachNo-debug
+        name: GachNo-v1.0.0-debug
         path: app/build/outputs/apk/debug/*.apk
 
-    - name: Create Release
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: GachNo-v1.0.0-release
+        path: app/build/outputs/apk/release/*.apk
+
+    - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v2
       with:
+        name: "GachNo ${{ github.ref_name }}"
+        body: |
+          ## GachNo ${{ github.ref_name }}
+
+          Ứng dụng chuyển tiếp thông báo ngân hàng qua webhook để gạch nợ học phí tự động.
+
+          ### Tính năng chính:
+          - 🔔 Lắng nghe thông báo từ app ngân hàng
+          - 🚀 Chuyển tiếp tự động qua Webhook (HTTP POST)
+          - 📝 Cấu hình Params body template linh hoạt
+          - 🔋 Tối ưu pin, chạy ngầm 24/24
+          - 🧪 Test gửi thử với nội dung tùy chỉnh
+          - 🌐 Hỗ trợ Tiếng Việt / English
+
+          ### Cài đặt:
+          1. Tải file `GachNo-v1.0.0-release.apk`
+          2. Cài đặt trên điện thoại Android (bật "Nguồn không xác định")
+          3. Cấp quyền Notification Access
+          4. Nhập Webhook URL và bấm Bật chuyển tiếp
         files: |
-          app/build/outputs/apk/debug/*.apk
-        generate_release_notes: true
+          app/build/outputs/apk/debug/GachNo-*.apk
+          app/build/outputs/apk/release/GachNo-*.apk
+        generate_release_notes: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
