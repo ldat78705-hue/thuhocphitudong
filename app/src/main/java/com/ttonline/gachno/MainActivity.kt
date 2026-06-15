@@ -112,23 +112,7 @@ class MainActivity : AppCompatActivity() {
         // --- Forwarding Toggle ---
         binding.switchForwarding.isChecked = settings.isForwardingEnabled
         binding.switchForwarding.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked && !isNotificationListenerEnabled()) {
-                binding.switchForwarding.isChecked = false
-                showEnableNotificationListenerDialog()
-                return@setOnCheckedChangeListener
-            }
-            settings.isForwardingEnabled = isChecked
-            if (isChecked) {
-                ForegroundService.start(this)
-            } else {
-                ForegroundService.stop(this)
-            }
-            updateServiceStatus()
-            // Prevent auto-scroll: clear focus and scroll to top
-            binding.switchForwarding.clearFocus()
-            binding.scrollView.post {
-                binding.scrollView.scrollTo(0, 0)
-            }
+            onForwardingToggled(isChecked)
         }
 
         // --- Service Status Button ---
@@ -190,9 +174,42 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun onForwardingToggled(isChecked: Boolean) {
+        if (isChecked && !isNotificationListenerEnabled()) {
+            // Temporarily remove listener to prevent loop
+            binding.switchForwarding.setOnCheckedChangeListener(null)
+            binding.switchForwarding.isChecked = false
+            binding.switchForwarding.setOnCheckedChangeListener { _, checked ->
+                onForwardingToggled(checked)
+            }
+            showEnableNotificationListenerDialog()
+            return
+        }
+        settings.isForwardingEnabled = isChecked
+        if (isChecked) {
+            ForegroundService.start(this)
+        } else {
+            ForegroundService.stop(this)
+        }
+        updateServiceStatus()
+        // Prevent auto-scroll
+        binding.switchForwarding.clearFocus()
+        binding.scrollView.post {
+            binding.scrollView.scrollTo(0, 0)
+        }
+    }
+
     private fun updateServiceStatus() {
         val isListenerEnabled = isNotificationListenerEnabled()
-        val isForwarding = settings.isForwardingEnabled && isListenerEnabled
+        val isForwarding = settings.isForwardingEnabled
+
+        // Temporarily remove listener to prevent triggering onCheckedChanged
+        binding.switchForwarding.setOnCheckedChangeListener(null)
+        binding.switchForwarding.isChecked = isForwarding
+        // Re-attach listener
+        binding.switchForwarding.setOnCheckedChangeListener { _, isChecked ->
+            onForwardingToggled(isChecked)
+        }
 
         if (isListenerEnabled) {
             binding.tvServiceStatus.text = if (isForwarding) {
@@ -211,7 +228,6 @@ class MainActivity : AppCompatActivity() {
             binding.tvServiceStatus.setTextColor(getColor(R.color.status_error))
             binding.btnGrantPermission.text = getString(R.string.grant_permission)
             binding.btnGrantPermission.isEnabled = true
-            binding.switchForwarding.isChecked = false
         }
     }
 
