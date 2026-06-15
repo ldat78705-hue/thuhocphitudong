@@ -42,7 +42,7 @@ class SendWorker(
         val deviceName = inputData.getString(KEY_DEVICE_NAME) ?: ""
         val paramsTemplate = inputData.getString(KEY_PARAMS_TEMPLATE) ?: ""
         val headersJson = inputData.getString(KEY_HEADERS_JSON) ?: ""
-        val logId = inputData.getString(KEY_LOG_ID) ?: ""
+        val logId = inputData.getLong(KEY_LOG_ID, 0L)
         val timeout = inputData.getLong(KEY_TIMEOUT, 10)
         val maxRetries = inputData.getInt(KEY_MAX_RETRIES, 3)
 
