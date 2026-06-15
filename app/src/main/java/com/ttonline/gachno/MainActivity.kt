@@ -124,6 +124,11 @@ class MainActivity : AppCompatActivity() {
                 ForegroundService.stop(this)
             }
             updateServiceStatus()
+            // Prevent auto-scroll: clear focus and scroll to top
+            binding.switchForwarding.clearFocus()
+            binding.scrollView.post {
+                binding.scrollView.scrollTo(0, 0)
+            }
         }
 
         // --- Service Status Button ---
