@@ -12,6 +12,8 @@
     <string name="test_notification">🔔 Kiểm tra quyền đọc thông báo</string>
     <string name="test_notif_ok">✅ Đang lắng nghe thông báo bình thường!</string>
     <string name="test_notif_fail">❌ Chưa kết nối. Vui lòng cấp quyền đọc thông báo.</string>
+    <string name="battery_optimize">🔋 Tắt tối ưu pin</string>
+    <string name="battery_already_disabled">✅ Đã tắt tối ưu pin</string>
 
     <string name="webhook_url">Địa chỉ Webhook</string>
     <string name="test_webhook">🚀 Thử Webhook</string>
@@ -23,13 +25,20 @@
     <string name="app_filter">Lọc ứng dụng</string>
     <string name="select">Chọn</string>
     <string name="all_apps_selected">Theo dõi tất cả ứng dụng</string>
-    <string name="test_full_flow">🧪 Kiểm tra toàn bộ (Giả lập thông báo ngân hàng)</string>
+    <string name="apps_selected_count">Đang theo dõi %d ứng dụng</string>
+
+    <!-- Test toàn bộ -->
+    <string name="test_full_flow_title">🧪 Kiểm tra toàn bộ</string>
+    <string name="test_full_flow_desc">Giả lập thông báo ngân hàng và gửi lên webhook. Chỉnh sửa nội dung bên dưới rồi bấm Gửi thử. Nội dung sẽ được lưu lại cho lần sau.</string>
+    <string name="test_app_name_hint">Tên app (VD: MB Bank)</string>
+    <string name="test_title_hint">Tiêu đề thông báo</string>
+    <string name="test_content_hint">Nội dung thông báo</string>
+    <string name="test_full_flow">🚀 Gửi thử</string>
     <string name="test_flow_running">Đang kiểm tra…</string>
     <string name="test_flow_success">✅ Kiểm tra thành công! Đã gửi thông báo giả lập lên webhook (HTTP %d)</string>
     <string name="test_flow_failed">❌ Kiểm tra thất bại: %s</string>
     <string name="test_flow_no_url">❌ Vui lòng nhập địa chỉ Webhook trước</string>
     <string name="test_flow_no_permission">❌ Vui lòng cấp quyền đọc thông báo trước</string>
-    <string name="apps_selected_count">Đang theo dõi %d ứng dụng</string>
 
     <string name="logs">Nhật ký chuyển tiếp</string>
     <string name="clear">Xóa</string>

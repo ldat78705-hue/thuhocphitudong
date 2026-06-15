@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">GachNo</string>
 
-    <!-- Main screen -->
+    <!-- Main Screen -->
     <string name="forwarding">Notification Forwarding</string>
     <string name="status_active">🟢 Active - Forwarding notifications</string>
     <string name="status_paused">⏸️ Paused - Toggle to start</string>
@@ -12,38 +12,47 @@
     <string name="test_notification">🔔 Test Notification Listener</string>
     <string name="test_notif_ok">✅ Notification listener is working!</string>
     <string name="test_notif_fail">❌ Notification listener is NOT connected. Please grant permission.</string>
+    <string name="battery_optimize">🔋 Disable Battery Optimization</string>
+    <string name="battery_already_disabled">✅ Battery optimization already disabled</string>
 
     <string name="webhook_url">Webhook URL</string>
     <string name="test_webhook">🚀 Test Webhook</string>
     <string name="testing">Testing…</string>
     <string name="test_success">✅ Success! HTTP %d</string>
     <string name="test_failed">❌ Failed: %s</string>
-    <string name="enter_webhook_url">Please enter Webhook URL first</string>
+    <string name="enter_webhook_url">Please enter webhook URL first</string>
 
     <string name="app_filter">App Filter</string>
     <string name="select">Select</string>
     <string name="all_apps_selected">Monitoring all apps</string>
-    <string name="test_full_flow">🧪 Test Full Flow (Simulate Bank Notification)</string>
+    <string name="apps_selected_count">Monitoring %d app(s)</string>
+
+    <!-- Test Full Flow -->
+    <string name="test_full_flow_title">🧪 Test Full Flow</string>
+    <string name="test_full_flow_desc">Simulate a bank notification and send it to your webhook. Edit the fields below and tap Test. Content is saved for next time.</string>
+    <string name="test_app_name_hint">App Name (e.g. MB Bank)</string>
+    <string name="test_title_hint">Notification Title</string>
+    <string name="test_content_hint">Notification Content</string>
+    <string name="test_full_flow">🚀 Send Test</string>
     <string name="test_flow_running">Testing…</string>
     <string name="test_flow_success">✅ Full test passed! Simulated notification sent to webhook successfully (HTTP %d)</string>
     <string name="test_flow_failed">❌ Test failed: %s</string>
     <string name="test_flow_no_url">❌ Please enter Webhook URL first</string>
     <string name="test_flow_no_permission">❌ Please grant notification permission first</string>
-    <string name="apps_selected_count">Monitoring %d app(s)</string>
 
     <string name="logs">Forwarding Logs</string>
     <string name="clear">Clear</string>
     <string name="log_count">%d entries</string>
-    <string name="no_logs">No logs yet. Notifications will appear here after being forwarded.</string>
+    <string name="no_logs">No logs yet. Notifications will appear here after forwarding.</string>
     <string name="logs_cleared">Logs cleared</string>
 
     <!-- Permission dialog -->
     <string name="permission_required">Permission Required</string>
-    <string name="permission_message">GachNo needs Notification Access permission to read and forward app notifications.\n\nPlease enable \"GachNo\" in the Notification Access settings.</string>
+    <string name="permission_message">GachNo needs Notification Access to read and forward notifications from your apps.\n\nPlease enable \"GachNo\" in Notification Access settings.</string>
     <string name="go_to_settings">Go to Settings</string>
     <string name="cancel">Cancel</string>
 
-    <!-- App filter screen -->
+    <!-- App Filter Screen -->
     <string name="select_apps">Select Apps</string>
     <string name="search_apps">Search apps…</string>
     <string name="select_all">Select All</string>

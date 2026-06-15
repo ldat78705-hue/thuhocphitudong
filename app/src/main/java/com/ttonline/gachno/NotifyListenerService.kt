@@ -21,6 +21,8 @@ import kotlinx.coroutines.launch
  * - Extracts EXTRA_TITLE, EXTRA_TEXT, EXTRA_BIG_TEXT (for expanded bank notifications)
  * - Falls back to tickerText when text is empty
  * - Wraps everything in try-catch for stability
+ * - Filters duplicate notifications within configurable interval
+ * - Uses WakeLock during webhook send for reliability
  */
 @Suppress("DEPRECATION")
 class NotifyListenerService : NotificationListenerService() {
@@ -62,7 +64,7 @@ class NotifyListenerService : NotificationListenerService() {
         isRunning = false
         Log.d(TAG, "Notification listener disconnected - requesting rebind")
 
-        // Only forward when enabled
+        // Only attempt rebind when forwarding is enabled
         if (!settings.isForwardingEnabled) return
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -78,6 +80,7 @@ class NotifyListenerService : NotificationListenerService() {
      * 3. Try EXTRA_BIG_TEXT (expanded notifications - crucial for bank messages)
      * 4. Fallback to tickerText
      * 5. Skip if both title and text are empty
+     * 6. Check for duplicate notifications
      */
     @SuppressLint("DiscouragedPrivateApi")
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -128,6 +131,12 @@ class NotifyListenerService : NotificationListenerService() {
             // Skip empty notifications (same as SmsForwarder)
             if (title.isEmpty() && text.isEmpty()) return
 
+            // === Duplicate detection (like SmsForwarder's duplicateMessagesLimits) ===
+            if (settings.isDuplicate(packageName, title, text)) {
+                Log.d(TAG, "Duplicate notification skipped: $packageName - $title")
+                return
+            }
+
             // Get app name
             val appName = try {
                 val pm = packageManager
@@ -148,7 +157,7 @@ class NotifyListenerService : NotificationListenerService() {
             )
             settings.addLog(logEntry)
 
-            // Send to webhook
+            // Send to webhook with WakeLock and configurable timeout/retry
             serviceScope.launch {
                 try {
                     val result = webhookSender.send(
@@ -157,7 +166,10 @@ class NotifyListenerService : NotificationListenerService() {
                         packageName = packageName,
                         title = title,
                         content = text,
-                        deviceName = settings.deviceName
+                        deviceName = settings.deviceName,
+                        context = this@NotifyListenerService,
+                        timeoutSeconds = settings.requestTimeout.toLong(),
+                        maxRetries = settings.retryTimes
                     )
 
                     if (result.success) {
@@ -185,6 +197,6 @@ class NotifyListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        Log.d(TAG, "Removed Package Name : ${sbn?.packageName}")
+        // No-op, just log for debugging
     }
 }

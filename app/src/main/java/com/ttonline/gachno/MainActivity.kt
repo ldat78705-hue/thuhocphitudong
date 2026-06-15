@@ -1,13 +1,16 @@
 package com.ttonline.gachno
 
+import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.text.TextUtils
 import android.widget.Toast
@@ -24,9 +27,10 @@ import java.util.Locale
  * Main screen of GachNo app.
  * Single-screen UI with:
  * - Forwarding toggle (on/off)
- * - Webhook URL input
- * - Test button
+ * - Webhook URL input + test
  * - App filter button
+ * - Full-flow test with editable fields (saved for reuse)
+ * - Battery optimization bypass
  * - Recent forwarding logs
  * - Language switch (Việt/English)
  */
@@ -71,6 +75,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        // Save test fields when leaving
+        saveTestFields()
         try {
             unregisterReceiver(logUpdateReceiver)
         } catch (_: Exception) {}
@@ -104,14 +110,19 @@ class MainActivity : AppCompatActivity() {
             openNotificationListenerSettings()
         }
 
-        // --- Test Webhook Button ---
-        binding.btnTestWebhook.setOnClickListener {
-            testWebhook()
+        // --- Battery Optimization ---
+        binding.btnBatteryOptimize.setOnClickListener {
+            requestDisableBatteryOptimization()
         }
 
         // --- Test Notification Listener ---
         binding.btnTestNotification.setOnClickListener {
             testNotificationListener()
+        }
+
+        // --- Test Webhook Button ---
+        binding.btnTestWebhook.setOnClickListener {
+            testWebhook()
         }
 
         // --- Select Apps Button ---
@@ -143,8 +154,12 @@ class MainActivity : AppCompatActivity() {
         // --- Show selected apps count ---
         updateSelectedAppsCount()
 
+        // --- Load saved test fields ---
+        loadTestFields()
+
         // --- Test Full Flow ---
         binding.btnTestFullFlow.setOnClickListener {
+            saveTestFields()
             testFullFlow()
         }
     }
@@ -204,6 +219,11 @@ class MainActivity : AppCompatActivity() {
         updateSelectedAppsCount()
     }
 
+    // ==================== TEST FUNCTIONS ====================
+
+    /**
+     * Test webhook connection (simple ping test)
+     */
     private fun testWebhook() {
         val url = binding.etWebhookUrl.text.toString().trim()
         if (url.isBlank()) {
@@ -222,7 +242,10 @@ class MainActivity : AppCompatActivity() {
                 packageName = packageName,
                 title = "Test Notification",
                 content = "Đây là tin nhắn kiểm tra từ GachNo. This is a test message from GachNo.",
-                deviceName = settings.deviceName
+                deviceName = settings.deviceName,
+                context = this@MainActivity,
+                timeoutSeconds = settings.requestTimeout.toLong(),
+                maxRetries = 0 // No retry for quick test
             )
 
             binding.btnTestWebhook.isEnabled = true
@@ -259,8 +282,7 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Test full flow: simulate a bank notification and send it to webhook.
-     * Like SmsForwarder's test feature - creates a fake bank message
-     * and sends it through the same webhook pipeline.
+     * Uses editable fields that are saved/restored across sessions.
      */
     private fun testFullFlow() {
         // Check permission first
@@ -281,16 +303,18 @@ class MainActivity : AppCompatActivity() {
         }
         settings.webhookUrl = url
 
+        // Get editable test data
+        val testAppName = binding.etTestAppName.text.toString().trim().ifBlank { "MB Bank (Test)" }
+        val testPackage = "com.test.app"
+        val testTitle = binding.etTestTitle.text.toString().trim().ifBlank { "Thông báo giao dịch" }
+        val testContent = binding.etTestContent.text.toString().trim().ifBlank {
+            "TK 0123456789 +500,000 VND. SD: 1,200,000 VND. GachNo test."
+        }
+
         binding.btnTestFullFlow.isEnabled = false
         binding.tvTestResult.visibility = android.view.View.VISIBLE
         binding.tvTestResult.text = getString(R.string.test_flow_running)
         binding.tvTestResult.setTextColor(getColor(R.color.text_secondary))
-
-        // Simulate a bank notification
-        val testAppName = "MB Bank (Test)"
-        val testPackage = "com.mbmobile"
-        val testTitle = "Thông báo giao dịch"
-        val testContent = "TK 0123456789 +500,000 VND lúc ${java.text.SimpleDateFormat("HH:mm dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date())}. SD: 1,200,000 VND. GachNo test."
 
         // Add log entry
         val logEntry = LogEntry(
@@ -308,7 +332,10 @@ class MainActivity : AppCompatActivity() {
                 packageName = testPackage,
                 title = testTitle,
                 content = testContent,
-                deviceName = settings.deviceName
+                deviceName = settings.deviceName,
+                context = this@MainActivity,
+                timeoutSeconds = settings.requestTimeout.toLong(),
+                maxRetries = settings.retryTimes
             )
 
             binding.btnTestFullFlow.isEnabled = true
@@ -326,6 +353,51 @@ class MainActivity : AppCompatActivity() {
             refreshLogs()
         }
     }
+
+    // ==================== TEST FIELD PERSISTENCE ====================
+
+    private fun loadTestFields() {
+        binding.etTestAppName.setText(settings.testAppName)
+        binding.etTestTitle.setText(settings.testTitle)
+        binding.etTestContent.setText(settings.testContent)
+    }
+
+    private fun saveTestFields() {
+        val appName = binding.etTestAppName.text.toString().trim()
+        val title = binding.etTestTitle.text.toString().trim()
+        val content = binding.etTestContent.text.toString().trim()
+
+        if (appName.isNotEmpty()) settings.testAppName = appName
+        if (title.isNotEmpty()) settings.testTitle = title
+        if (content.isNotEmpty()) settings.testContent = content
+    }
+
+    // ==================== BATTERY OPTIMIZATION ====================
+
+    @SuppressLint("BatteryLife")
+    private fun requestDisableBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            if (pm.isIgnoringBatteryOptimizations(packageName)) {
+                Toast.makeText(this, getString(R.string.battery_already_disabled), Toast.LENGTH_SHORT).show()
+                return
+            }
+            try {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                intent.data = Uri.parse("package:$packageName")
+                startActivity(intent)
+            } catch (e: Exception) {
+                // Fallback to battery settings
+                try {
+                    startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                } catch (_: Exception) {
+                    startActivity(Intent(Settings.ACTION_SETTINGS))
+                }
+            }
+        }
+    }
+
+    // ==================== HELPERS ====================
 
     private fun isNotificationListenerEnabled(): Boolean {
         val cn = ComponentName(this, NotifyListenerService::class.java)
