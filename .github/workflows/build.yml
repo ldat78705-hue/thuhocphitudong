@@ -37,9 +37,6 @@ jobs:
     - name: Build Debug APK
       run: gradle assembleDebug
 
-    - name: Build Release APK
-      run: gradle assembleRelease
-
     - name: Get version name
       id: version
       run: |
@@ -52,7 +49,6 @@ jobs:
     - name: Rename APKs for clarity
       run: |
         mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/GachNo-${{ steps.version.outputs.VERSION }}-debug.apk || true
-        mv app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/GachNo-${{ steps.version.outputs.VERSION }}-release.apk || true
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
@@ -60,11 +56,6 @@ jobs:
         name: GachNo-${{ steps.version.outputs.VERSION }}-debug
         path: app/build/outputs/apk/debug/*.apk
 
-    - name: Upload Release APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: GachNo-${{ steps.version.outputs.VERSION }}-release
-        path: app/build/outputs/apk/release/*.apk
 
     - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/v')
@@ -91,7 +82,6 @@ jobs:
           4. Nhập Webhook URL và bấm Bật chuyển tiếp
         files: |
           app/build/outputs/apk/debug/GachNo-*.apk
-          app/build/outputs/apk/release/GachNo-*.apk
         generate_release_notes: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
