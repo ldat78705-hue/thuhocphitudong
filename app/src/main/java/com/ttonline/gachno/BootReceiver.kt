@@ -33,8 +33,8 @@ class BootReceiver : BroadcastReceiver() {
 
                 val settings = SettingsManager(context)
                 if (settings.isForwardingEnabled) {
-                    Log.d(TAG, "Forwarding enabled - starting ForegroundService")
-                    ForegroundService.start(context)
+                    Log.d(TAG, "Forwarding enabled - starting ForegroundService (boot)")
+                    ForegroundService.startFromBoot(context)
                 } else {
                     Log.d(TAG, "Forwarding disabled - service will not forward")
                 }

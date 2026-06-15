@@ -40,21 +40,30 @@ jobs:
     - name: Build Release APK
       run: gradle assembleRelease
 
+    - name: Get version name
+      id: version
+      run: |
+        if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=dev-$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+        fi
+
     - name: Rename APKs for clarity
       run: |
-        mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/GachNo-v1.0.0-debug.apk || true
-        mv app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/GachNo-v1.0.0-release.apk || true
+        mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/GachNo-${{ steps.version.outputs.VERSION }}-debug.apk || true
+        mv app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/GachNo-${{ steps.version.outputs.VERSION }}-release.apk || true
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
-        name: GachNo-v1.0.0-debug
+        name: GachNo-${{ steps.version.outputs.VERSION }}-debug
         path: app/build/outputs/apk/debug/*.apk
 
     - name: Upload Release APK
       uses: actions/upload-artifact@v4
       with:
-        name: GachNo-v1.0.0-release
+        name: GachNo-${{ steps.version.outputs.VERSION }}-release
         path: app/build/outputs/apk/release/*.apk
 
     - name: Create GitHub Release
@@ -76,8 +85,8 @@ jobs:
           - 🌐 Hỗ trợ Tiếng Việt / English
 
           ### Cài đặt:
-          1. Tải file `GachNo-v1.0.0-release.apk`
-          2. Cài đặt trên điện thoại Android (bật "Nguồn không xác định")
+          1. Tải file `GachNo-${{ github.ref_name }}-debug.apk`
+          2. Cài đặt trên điện thoại Android
           3. Cấp quyền Notification Access
           4. Nhập Webhook URL và bấm Bật chuyển tiếp
         files: |

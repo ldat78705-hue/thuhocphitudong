@@ -44,6 +44,16 @@ class ForegroundService : Service() {
             }
         }
 
+        fun startFromBoot(context: Context) {
+            val intent = Intent(context, ForegroundService::class.java)
+            intent.action = ACTION_START_BOOT
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
         fun stop(context: Context) {
             val intent = Intent(context, ForegroundService::class.java)
             intent.action = ACTION_STOP
@@ -51,6 +61,7 @@ class ForegroundService : Service() {
         }
 
         private const val ACTION_START = "com.ttonline.gachno.START"
+        private const val ACTION_START_BOOT = "com.ttonline.gachno.START_BOOT"
         private const val ACTION_STOP = "com.ttonline.gachno.STOP"
     }
 
@@ -62,6 +73,13 @@ class ForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> startForegroundService()
+            ACTION_START_BOOT -> {
+                startForegroundService()
+                // Delay toggle on boot to let system settle
+                android.os.Handler(mainLooper).postDelayed({
+                    toggleNotificationListenerService()
+                }, 3000)
+            }
             ACTION_STOP -> stopForegroundService()
         }
         return START_STICKY
@@ -82,10 +100,6 @@ class ForegroundService : Service() {
             getString(R.string.foreground_running)
         )
         startForeground(NOTIFY_ID, notification)
-
-        // Toggle NotificationListenerService to force reconnection
-        // Same approach as SmsForwarder's CommonUtils.toggleNotificationListenerService()
-        toggleNotificationListenerService()
 
         Log.d(TAG, "Foreground service started")
     }
