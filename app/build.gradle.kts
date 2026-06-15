@@ -11,8 +11,8 @@ android {
         applicationId = "com.ttonline.gachno"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.3.0"
+        versionCode = 5
+        versionName = "1.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -51,6 +51,9 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // WorkManager for guaranteed webhook delivery (same as SmsForwarder)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // OkHttp for webhook
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
