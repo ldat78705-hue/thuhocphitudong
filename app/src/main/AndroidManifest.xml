@@ -4,13 +4,14 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- Same as SmsForwarder: declare BIND_NOTIFICATION_LISTENER_SERVICE at manifest level -->
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
         tools:ignore="ProtectedPermissions" />
 
@@ -41,7 +42,7 @@
             android:exported="false"
             android:label="@string/select_apps" />
 
-        <!-- NotificationListenerService - matching SmsForwarder exactly -->
+        <!-- NotificationListenerService -->
         <service
             android:name=".NotifyListenerService"
             android:enabled="true"
@@ -53,6 +54,17 @@
             </intent-filter>
         </service>
 
+        <!-- ForegroundService to keep process alive (Android 14 requires specialUse type) -->
+        <service
+            android:name=".ForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:stopWithTask="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps notification listener alive to forward bank notifications" />
+        </service>
 
         <receiver
             android:name=".BootReceiver"

@@ -57,6 +57,11 @@ class MainActivity : AppCompatActivity() {
 
         setupUI()
         refreshLogs()
+
+        // Ensure ForegroundService is running if forwarding is enabled
+        if (settings.isForwardingEnabled) {
+            ForegroundService.start(this)
+        }
     }
 
     override fun onResume() {
@@ -181,6 +186,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
         settings.isForwardingEnabled = isChecked
+        // Start/stop ForegroundService to keep process alive
+        if (isChecked) {
+            ForegroundService.start(this)
+        } else {
+            ForegroundService.stop(this)
+        }
         updateServiceStatus()
         // Prevent auto-scroll
         binding.switchForwarding.clearFocus()

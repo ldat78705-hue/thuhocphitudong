@@ -6,9 +6,9 @@ import android.content.Intent
 import android.util.Log
 
 /**
- * Ensures the notification listener service stays active after device reboot.
+ * Starts ForegroundService on boot to keep the process alive.
  * NotificationListenerService auto-starts if permission is granted,
- * this receiver just logs the boot event for debugging.
+ * but without ForegroundService the process gets killed by Android.
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -25,13 +25,14 @@ class BootReceiver : BroadcastReceiver() {
             "android.intent.action.QUICKBOOT_POWERON",
             "com.htc.intent.action.QUICKBOOT_POWERON",
             "android.intent.action.REBOOT" -> {
-                Log.d(TAG, "Device boot detected: $action")
+                Log.d(TAG, "Boot detected: $action")
 
                 val settings = SettingsManager(context)
                 if (settings.isForwardingEnabled) {
-                    Log.d(TAG, "Forwarding enabled - NotificationListenerService will auto-start")
+                    Log.d(TAG, "Forwarding ON - starting ForegroundService")
+                    ForegroundService.start(context)
                 } else {
-                    Log.d(TAG, "Forwarding disabled - notifications will not be forwarded")
+                    Log.d(TAG, "Forwarding OFF - not starting service")
                 }
             }
         }
