@@ -5,19 +5,26 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 
 /**
- * Foreground Service that keeps GachNo process alive.
- * Without this, Android kills the process and NotificationListenerService dies.
+ * Foreground Service that:
+ * 1. Keeps GachNo process alive (prevents Android from killing it)
+ * 2. Toggles NotificationListenerService to force reconnection (delayed 3s)
  *
- * For Android 14 (API 34): foregroundServiceType="specialUse" is required.
+ * This is the KEY mechanism from SmsForwarder that makes it work reliably.
+ * Without ForegroundService, Android kills the process → listener dies.
  */
 class ForegroundService : Service() {
 
@@ -35,7 +42,7 @@ class ForegroundService : Service() {
                     context.startService(intent)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to start ForegroundService: ${e.message}")
+                Log.e(TAG, "Failed to start: ${e.message}")
             }
         }
 
@@ -43,10 +50,12 @@ class ForegroundService : Service() {
             try {
                 context.stopService(Intent(context, ForegroundService::class.java))
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to stop ForegroundService: ${e.message}")
+                Log.e(TAG, "Failed to stop: ${e.message}")
             }
         }
     }
+
+    private var hasToggled = false
 
     override fun onCreate() {
         super.onCreate()
@@ -57,25 +66,88 @@ class ForegroundService : Service() {
         val notification = createNotification()
 
         // Android 14+ requires foregroundServiceType in startForeground()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(
-                NOTIFY_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
-        } else {
-            startForeground(NOTIFY_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    NOTIFY_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFY_ID, notification)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground failed: ${e.message}")
+            // Fallback: just show notification
+            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            nm.notify(NOTIFY_ID, notification)
         }
 
-        Log.d(TAG, "ForegroundService started - process kept alive")
+        Log.d(TAG, "ForegroundService started")
+
+        // Toggle listener ONCE after 3 second delay
+        // This forces Android to rebind NotificationListenerService
+        // Same approach as SmsForwarder's CommonUtils.toggleNotificationListenerService()
+        if (!hasToggled) {
+            hasToggled = true
+            Handler(Looper.getMainLooper()).postDelayed({
+                toggleNotificationListenerService()
+            }, 3000)
+        }
+
         return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        hasToggled = false
         Log.d(TAG, "ForegroundService destroyed")
         super.onDestroy()
+    }
+
+    /**
+     * Toggle the NotificationListenerService component to force Android rebind.
+     * This is THE critical trick from SmsForwarder:
+     * - Disable component → Android unbinds listener
+     * - Enable component → Android rebinds listener
+     * - DONT_KILL_APP prevents process death
+     * - 3 second delay ensures the activity is already settled
+     */
+    private fun toggleNotificationListenerService() {
+        try {
+            val cn = ComponentName(this, NotifyListenerService::class.java)
+            val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+            
+            Log.d(TAG, "enabled_notification_listeners: $flat")
+            
+            if (flat != null && flat.contains(cn.flattenToString())) {
+                val pm = packageManager
+                
+                // Step 1: Disable
+                pm.setComponentEnabledSetting(
+                    cn,
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP
+                )
+                Log.d(TAG, "Listener component DISABLED")
+                
+                // Step 2: Wait 500ms then re-enable
+                Handler(Looper.getMainLooper()).postDelayed({
+                    pm.setComponentEnabledSetting(
+                        cn,
+                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                        PackageManager.DONT_KILL_APP
+                    )
+                    Log.d(TAG, "Listener component RE-ENABLED - rebind should happen now")
+                }, 500)
+            } else {
+                Log.w(TAG, "NotifyListenerService NOT in enabled_notification_listeners!")
+                Log.w(TAG, "User needs to grant Notification Access permission")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error toggling listener: ${e.message}")
+        }
     }
 
     private fun createNotificationChannel() {
