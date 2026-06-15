@@ -89,14 +89,23 @@ class NotifyListenerService : NotificationListenerService() {
             val notification = sbn?.notification ?: return
             val extras = notification.extras ?: return
 
+            val packageName = sbn.packageName ?: return
+
+            // Log ALL incoming notifications for debugging
+            Log.d(TAG, ">>> Notification received from: $packageName")
+
             // Check if forwarding is enabled
-            if (!settings.isForwardingEnabled) return
+            if (!settings.isForwardingEnabled) {
+                Log.d(TAG, "<<< SKIP: Forwarding disabled")
+                return
+            }
 
             // Check webhook URL
             val webhookUrl = settings.webhookUrl
-            if (webhookUrl.isBlank()) return
-
-            val packageName = sbn.packageName ?: return
+            if (webhookUrl.isBlank()) {
+                Log.d(TAG, "<<< SKIP: Webhook URL is blank")
+                return
+            }
 
             // Skip our own notifications
             if (packageName == this.packageName) return
@@ -105,7 +114,10 @@ class NotifyListenerService : NotificationListenerService() {
             if (packageName == "android" || packageName == "com.android.systemui") return
 
             // Check if this app is in the filter list
-            if (!settings.isAppSelected(packageName)) return
+            if (!settings.isAppSelected(packageName)) {
+                Log.d(TAG, "<<< SKIP: App not in filter: $packageName")
+                return
+            }
 
             // === Extract notification data (matching SmsForwarder's logic exactly) ===
 

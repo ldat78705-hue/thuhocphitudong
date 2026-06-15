@@ -47,6 +47,11 @@
             </intent-filter>
         </service>
 
+        <service
+            android:name=".ForegroundService"
+            android:exported="false"
+            android:stopWithTask="false" />
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

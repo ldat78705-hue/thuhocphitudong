@@ -31,10 +31,10 @@ class BootReceiver : BroadcastReceiver() {
             "android.intent.action.REBOOT" -> {
                 Log.d(TAG, "Device boot detected: $action")
 
-                // Verify settings are initialized
                 val settings = SettingsManager(context)
                 if (settings.isForwardingEnabled) {
-                    Log.d(TAG, "Forwarding enabled - NotificationListenerService will auto-start")
+                    Log.d(TAG, "Forwarding enabled - starting ForegroundService")
+                    ForegroundService.start(context)
                 } else {
                     Log.d(TAG, "Forwarding disabled - service will not forward")
                 }

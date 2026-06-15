@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">GachNo</string>
+    <string name="foreground_running">Đang giám sát thông báo…</string>
+    <string name="foreground_description">Giữ GachNo chạy nền để chuyển tiếp thông báo</string>
 
     <!-- Màn hình chính -->
     <string name="forwarding">Chuyển tiếp thông báo</string>
+    <string name="permissions_title">Quyền &amp; Trạng thái</string>
     <string name="status_active">🟢 Đang hoạt động - Chuyển tiếp thông báo</string>
     <string name="status_paused">⏸️ Tạm dừng - Bật để bắt đầu</string>
     <string name="status_no_permission">🔴 Cần cấp quyền truy cập</string>

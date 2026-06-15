@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">GachNo</string>
+    <string name="foreground_running">Monitoring notifications…</string>
+    <string name="foreground_description">Keeps GachNo running in the background to forward notifications</string>
 
     <!-- Main Screen -->
     <string name="forwarding">Notification Forwarding</string>
+    <string name="permissions_title">Permissions &amp; Status</string>
     <string name="status_active">🟢 Active - Forwarding notifications</string>
     <string name="status_paused">⏸️ Paused - Toggle to start</string>
     <string name="status_no_permission">🔴 Permission required</string>
