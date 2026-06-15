@@ -8,7 +8,7 @@ import com.google.gson.reflect.TypeToken
 /**
  * Manages all app settings via SharedPreferences.
  * Stores webhook URL, filtered apps, forwarding state, logs, language preference,
- * duplicate filter, retry config, and editable test data.
+ * duplicate filter, retry config, webhook params template, and editable test data.
  *
  * Based on SmsForwarder's SettingUtils approach but simplified.
  */
@@ -17,6 +17,8 @@ class SettingsManager(context: Context) {
     companion object {
         private const val PREFS_NAME = "gachno_prefs"
         private const val KEY_WEBHOOK_URL = "webhook_url"
+        private const val KEY_WEBHOOK_PARAMS = "webhook_params"
+        private const val KEY_WEBHOOK_HEADERS = "webhook_headers"
         private const val KEY_SELECTED_APPS = "selected_apps"
         private const val KEY_FORWARDING_ENABLED = "forwarding_enabled"
         private const val KEY_LOGS = "logs"
@@ -35,6 +37,18 @@ class SettingsManager(context: Context) {
         private const val KEY_LAST_NOTIFY_TIME = "last_notify_time"
 
         private const val MAX_LOGS = 200
+
+        /**
+         * Default Params template (same format as SmsForwarder).
+         * Available placeholders:
+         *   [title]        - notification title
+         *   [content]      - notification content (full text)
+         *   [app_name]     - app label (e.g. "MB Bank")
+         *   [package_name] - package (e.g. "com.mbmobile")
+         *   [device_name]  - device model
+         *   [timestamp]    - ISO 8601 timestamp
+         */
+        const val DEFAULT_PARAMS = """{"text": "[title] [content]"}"""
     }
 
     private val prefs: SharedPreferences =
@@ -45,6 +59,17 @@ class SettingsManager(context: Context) {
     var webhookUrl: String
         get() = prefs.getString(KEY_WEBHOOK_URL, "") ?: ""
         set(value) = prefs.edit().putString(KEY_WEBHOOK_URL, value).apply()
+
+    // --- Webhook Params (body template with placeholders) ---
+    // Same concept as SmsForwarder's webParams field
+    var webhookParams: String
+        get() = prefs.getString(KEY_WEBHOOK_PARAMS, DEFAULT_PARAMS) ?: DEFAULT_PARAMS
+        set(value) = prefs.edit().putString(KEY_WEBHOOK_PARAMS, value).apply()
+
+    // --- Webhook Headers (key:value pairs, one per line) ---
+    var webhookHeaders: String
+        get() = prefs.getString(KEY_WEBHOOK_HEADERS, "Content-Type: application/json") ?: "Content-Type: application/json"
+        set(value) = prefs.edit().putString(KEY_WEBHOOK_HEADERS, value).apply()
 
     // --- Device Name ---
     var deviceName: String
@@ -62,17 +87,16 @@ class SettingsManager(context: Context) {
         set(value) = prefs.edit().putString(KEY_LANGUAGE, value).apply()
 
     // --- Duplicate Filter Interval (seconds, 0 = disabled) ---
-    // SmsForwarder: duplicateMessagesLimits
     var duplicateInterval: Int
         get() = prefs.getInt(KEY_DUPLICATE_INTERVAL, 30)
         set(value) = prefs.edit().putInt(KEY_DUPLICATE_INTERVAL, value).apply()
 
-    // --- Retry Times (0 = no retry, same as SmsForwarder requestRetryTimes) ---
+    // --- Retry Times ---
     var retryTimes: Int
         get() = prefs.getInt(KEY_RETRY_TIMES, 1)
         set(value) = prefs.edit().putInt(KEY_RETRY_TIMES, value).apply()
 
-    // --- Request Timeout (seconds, same as SmsForwarder requestTimeout) ---
+    // --- Request Timeout (seconds) ---
     var requestTimeout: Int
         get() = prefs.getInt(KEY_REQUEST_TIMEOUT, 15)
         set(value) = prefs.edit().putInt(KEY_REQUEST_TIMEOUT, value).apply()
@@ -113,12 +137,10 @@ class SettingsManager(context: Context) {
 
     fun isAppSelected(packageName: String): Boolean {
         val selectedApps = getSelectedApps()
-        // If no apps selected, forward all
         return selectedApps.isEmpty() || selectedApps.contains(packageName)
     }
 
     // --- Duplicate Detection ---
-    // Returns true if this notification is a duplicate (same content within interval)
     fun isDuplicate(packageName: String, title: String, content: String): Boolean {
         val interval = duplicateInterval
         if (interval <= 0) return false
@@ -132,12 +154,26 @@ class SettingsManager(context: Context) {
             return true
         }
 
-        // Save current
         prefs.edit()
             .putInt(KEY_LAST_NOTIFY_HASH, hash)
             .putLong(KEY_LAST_NOTIFY_TIME, now)
             .apply()
         return false
+    }
+
+    /**
+     * Parse webhook headers string into a Map.
+     * Format: "Key: Value" (one per line)
+     */
+    fun getHeadersMap(): Map<String, String> {
+        val headersStr = webhookHeaders
+        if (headersStr.isBlank()) return emptyMap()
+        return headersStr.lines()
+            .filter { it.contains(":") }
+            .associate {
+                val parts = it.split(":", limit = 2)
+                parts[0].trim() to parts[1].trim()
+            }
     }
 
     // --- Logs ---
@@ -153,8 +189,7 @@ class SettingsManager(context: Context) {
 
     fun addLog(entry: LogEntry) {
         val logs = getLogs()
-        logs.add(0, entry) // Add to beginning
-        // Keep only last MAX_LOGS entries
+        logs.add(0, entry)
         while (logs.size > MAX_LOGS) {
             logs.removeAt(logs.size - 1)
         }

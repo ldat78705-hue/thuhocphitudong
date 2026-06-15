@@ -10,7 +10,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import com.google.gson.Gson
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -19,30 +18,17 @@ import java.util.concurrent.TimeUnit
 /**
  * Sends notification data to the configured webhook URL via HTTP POST.
  *
- * Based on SmsForwarder's WebhookUtils approach:
- * - Configurable timeout (requestTimeout)
- * - Configurable retry (requestRetryTimes)
- * - WakeLock to prevent CPU sleep during send
- * - JSON payload with Content-Type header
- * - User-Agent header
+ * Supports configurable body template (Params) with placeholders:
+ *   [title], [content], [app_name], [package_name], [device_name], [timestamp]
+ *
+ * Same concept as SmsForwarder's WebhookUtils - the Params field in the UI
+ * lets the user define the exact JSON body that the server expects.
  */
 class WebhookSender {
 
     companion object {
         private const val TAG = "GachNo_Webhook"
-        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
-
-    private val gson = Gson()
-
-    data class WebhookPayload(
-        val app_name: String,
-        val package_name: String,
-        val title: String,
-        val content: String,
-        val timestamp: String,
-        val device_name: String
-    )
 
     data class WebhookResult(
         val success: Boolean,
@@ -63,12 +49,60 @@ class WebhookSender {
     }
 
     /**
-     * Send notification data to webhook URL.
+     * Replace template placeholders in params body.
+     * Same as SmsForwarder's webParams replacement logic.
+     */
+    private fun buildBody(
+        template: String,
+        appName: String,
+        packageName: String,
+        title: String,
+        content: String,
+        deviceName: String,
+        timestamp: String
+    ): String {
+        return template
+            .replace("[title]", escapeJson(title))
+            .replace("[content]", escapeJson(content))
+            .replace("[app_name]", escapeJson(appName))
+            .replace("[package_name]", escapeJson(packageName))
+            .replace("[device_name]", escapeJson(deviceName))
+            .replace("[timestamp]", escapeJson(timestamp))
+    }
+
+    /**
+     * Escape special characters for JSON string values.
+     */
+    private fun escapeJson(value: String): String {
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+    }
+
+    /**
+     * Detect content type from headers or body.
+     */
+    private fun detectMediaType(headers: Map<String, String>, body: String): okhttp3.MediaType {
+        val contentType = headers.entries
+            .firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }
+            ?.value
+
+        return try {
+            (contentType ?: "application/json; charset=utf-8").toMediaType()
+        } catch (e: Exception) {
+            "application/json; charset=utf-8".toMediaType()
+        }
+    }
+
+    /**
+     * Send notification data to webhook URL using the configured Params template.
      * Runs on IO dispatcher, safe to call from coroutine.
      *
-     * @param context Optional context for WakeLock
-     * @param timeoutSeconds Configurable timeout (from settings)
-     * @param maxRetries Number of retries on failure (from settings)
+     * @param paramsTemplate The body template string (e.g. {"text": "[title] [content]"})
+     * @param headers Custom headers map
      */
     suspend fun send(
         webhookUrl: String,
@@ -79,14 +113,15 @@ class WebhookSender {
         deviceName: String,
         context: Context? = null,
         timeoutSeconds: Long = 15L,
-        maxRetries: Int = 1
+        maxRetries: Int = 1,
+        paramsTemplate: String = """{"text": "[title] [content]"}""",
+        headers: Map<String, String> = mapOf("Content-Type" to "application/json")
     ): WebhookResult = withContext(Dispatchers.IO) {
         if (webhookUrl.isBlank()) {
             return@withContext WebhookResult(false, 0, "Webhook URL is empty")
         }
 
         // Acquire WakeLock to prevent CPU sleep during network call
-        // Same approach as SmsForwarder to ensure reliable delivery
         var wakeLock: PowerManager.WakeLock? = null
         try {
             if (context != null) {
@@ -95,35 +130,38 @@ class WebhookSender {
                     PowerManager.PARTIAL_WAKE_LOCK,
                     "GachNo::WebhookWakeLock"
                 )
-                wakeLock.acquire(60 * 1000L) // Max 60 seconds
+                wakeLock.acquire(60 * 1000L)
             }
 
             val client = buildClient(timeoutSeconds)
-
             val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault())
-            val payload = WebhookPayload(
-                app_name = appName,
-                package_name = packageName,
-                title = title,
-                content = content,
-                timestamp = sdf.format(Date()),
-                device_name = deviceName
-            )
+            val timestamp = sdf.format(Date())
 
-            val jsonBody = gson.toJson(payload)
+            // Build body from template with placeholders replaced
+            val bodyStr = buildBody(paramsTemplate, appName, packageName, title, content, deviceName, timestamp)
+            val mediaType = detectMediaType(headers, bodyStr)
+
+            Log.d(TAG, "Body: $bodyStr")
+
             var lastError = ""
             var lastCode = 0
 
-            // Try with configurable retries
             for (attempt in 0..maxRetries) {
                 try {
-                    val requestBody = jsonBody.toRequestBody(JSON_MEDIA_TYPE)
-                    val request = Request.Builder()
+                    val requestBody = bodyStr.toRequestBody(mediaType)
+                    val requestBuilder = Request.Builder()
                         .url(webhookUrl)
                         .post(requestBody)
-                        .addHeader("Content-Type", "application/json")
                         .addHeader("User-Agent", "GachNo/1.0")
-                        .build()
+
+                    // Add custom headers (skip Content-Type as it's set by media type)
+                    headers.forEach { (key, value) ->
+                        if (!key.equals("Content-Type", ignoreCase = true)) {
+                            requestBuilder.addHeader(key, value)
+                        }
+                    }
+
+                    val request = requestBuilder.build()
 
                     Log.d(TAG, "Sending webhook (attempt ${attempt + 1}/${maxRetries + 1}): $webhookUrl")
 
@@ -145,7 +183,6 @@ class WebhookSender {
                     Log.e(TAG, "Webhook error (attempt ${attempt + 1}): $lastError")
                 }
 
-                // Wait before retry (increasing delay)
                 if (attempt < maxRetries) {
                     val delayMs = (attempt + 1) * 2000L
                     Log.d(TAG, "Retrying in ${delayMs}ms...")
@@ -155,7 +192,6 @@ class WebhookSender {
 
             return@withContext WebhookResult(false, lastCode, lastError)
         } finally {
-            // Always release WakeLock
             try {
                 wakeLock?.let {
                     if (it.isHeld) it.release()

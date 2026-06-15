@@ -16,6 +16,9 @@
     <string name="battery_already_disabled">✅ Battery optimization already disabled</string>
 
     <string name="webhook_url">Webhook URL</string>
+    <string name="webhook_params">Params (Body Template)</string>
+    <string name="webhook_params_hint">Placeholders: [title] [content] [app_name] [package_name] [device_name] [timestamp]</string>
+    <string name="webhook_headers">Headers</string>
     <string name="test_webhook">🚀 Test Webhook</string>
     <string name="testing">Testing…</string>
     <string name="test_success">✅ Success! HTTP %d</string>

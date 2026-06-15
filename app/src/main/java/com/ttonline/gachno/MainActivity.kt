@@ -74,8 +74,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        // Save test fields when leaving
+        // Save all editable fields when leaving
         saveTestFields()
+        saveWebhookFields()
         try {
             unregisterReceiver(logUpdateReceiver)
         } catch (_: Exception) {}
@@ -84,6 +85,12 @@ class MainActivity : AppCompatActivity() {
     private fun setupUI() {
         // --- Webhook URL ---
         binding.etWebhookUrl.setText(settings.webhookUrl)
+
+        // --- Webhook Params (body template) ---
+        binding.etWebhookParams.setText(settings.webhookParams)
+
+        // --- Webhook Headers ---
+        binding.etWebhookHeaders.setText(settings.webhookHeaders)
 
         // Save URL when focus lost
         binding.etWebhookUrl.setOnFocusChangeListener { _, hasFocus ->
@@ -234,6 +241,9 @@ class MainActivity : AppCompatActivity() {
         binding.btnTestWebhook.isEnabled = false
         binding.btnTestWebhook.text = getString(R.string.testing)
 
+        // Save params/headers before testing
+        saveWebhookFields()
+
         CoroutineScope(Dispatchers.Main).launch {
             val result = webhookSender.send(
                 webhookUrl = url,
@@ -244,7 +254,9 @@ class MainActivity : AppCompatActivity() {
                 deviceName = settings.deviceName,
                 context = this@MainActivity,
                 timeoutSeconds = settings.requestTimeout.toLong(),
-                maxRetries = 0 // No retry for quick test
+                maxRetries = 0, // No retry for quick test
+                paramsTemplate = settings.webhookParams,
+                headers = settings.getHeadersMap()
             )
 
             binding.btnTestWebhook.isEnabled = true
@@ -334,7 +346,9 @@ class MainActivity : AppCompatActivity() {
                 deviceName = settings.deviceName,
                 context = this@MainActivity,
                 timeoutSeconds = settings.requestTimeout.toLong(),
-                maxRetries = settings.retryTimes
+                maxRetries = settings.retryTimes,
+                paramsTemplate = settings.webhookParams,
+                headers = settings.getHeadersMap()
             )
 
             binding.btnTestFullFlow.isEnabled = true
@@ -369,6 +383,16 @@ class MainActivity : AppCompatActivity() {
         if (appName.isNotEmpty()) settings.testAppName = appName
         if (title.isNotEmpty()) settings.testTitle = title
         if (content.isNotEmpty()) settings.testContent = content
+    }
+
+    private fun saveWebhookFields() {
+        val params = binding.etWebhookParams.text.toString().trim()
+        val headers = binding.etWebhookHeaders.text.toString().trim()
+        val url = binding.etWebhookUrl.text.toString().trim()
+
+        if (url.isNotEmpty()) settings.webhookUrl = url
+        if (params.isNotEmpty()) settings.webhookParams = params
+        if (headers.isNotEmpty()) settings.webhookHeaders = headers
     }
 
     // ==================== BATTERY OPTIMIZATION ====================

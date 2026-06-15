@@ -16,6 +16,9 @@
     <string name="battery_already_disabled">✅ Đã tắt tối ưu pin</string>
 
     <string name="webhook_url">Địa chỉ Webhook</string>
+    <string name="webhook_params">Params (Mẫu nội dung gửi)</string>
+    <string name="webhook_params_hint">Biến thay thế: [title] [content] [app_name] [package_name] [device_name] [timestamp]</string>
+    <string name="webhook_headers">Headers</string>
     <string name="test_webhook">🚀 Thử Webhook</string>
     <string name="testing">Đang thử…</string>
     <string name="test_success">✅ Thành công! HTTP %d</string>

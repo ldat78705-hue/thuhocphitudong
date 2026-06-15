@@ -169,7 +169,9 @@ class NotifyListenerService : NotificationListenerService() {
                         deviceName = settings.deviceName,
                         context = this@NotifyListenerService,
                         timeoutSeconds = settings.requestTimeout.toLong(),
-                        maxRetries = settings.retryTimes
+                        maxRetries = settings.retryTimes,
+                        paramsTemplate = settings.webhookParams,
+                        headers = settings.getHeadersMap()
                     )
 
                     if (result.success) {
