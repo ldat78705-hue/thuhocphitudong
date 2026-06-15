@@ -17,6 +17,9 @@
     <string name="test_notif_fail">❌ Chưa kết nối. Vui lòng cấp quyền đọc thông báo.</string>
     <string name="battery_optimize">🔋 Tắt tối ưu pin</string>
     <string name="battery_already_disabled">✅ Đã tắt tối ưu pin</string>
+    <string name="auto_start_setting">🔄 Cài đặt tự khởi động</string>
+    <string name="auto_start_dialog_title">Bật tự khởi động</string>
+    <string name="auto_start_dialog_msg">Để GachNo hoạt động sau khi khởi động lại máy, cần bật quyền Tự khởi động.\n\nVào: Cài đặt → Ứng dụng → GachNo → Tự khởi động → BẬT\n\nHoặc: Cài đặt → Pin → Khởi chạy ứng dụng → GachNo → Quản lý thủ công → Bật tất cả</string>
 
     <string name="webhook_url">Địa chỉ Webhook</string>
     <string name="webhook_params">Params (Mẫu nội dung gửi)</string>

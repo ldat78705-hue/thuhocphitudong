@@ -51,8 +51,15 @@ class SettingsManager(context: Context) {
         const val DEFAULT_PARAMS = """{"text": "[title] [content]"}"""
     }
 
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = run {
+        // Use device-protected storage so settings survive direct boot
+        val storageContext = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            context.createDeviceProtectedStorageContext()
+        } else {
+            context
+        }
+        storageContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
     private val gson = Gson()
 
     // --- Webhook URL ---

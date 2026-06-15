@@ -125,6 +125,11 @@ class MainActivity : AppCompatActivity() {
             requestDisableBatteryOptimization()
         }
 
+        // --- Auto-Start Setting (for Honor/Huawei/Xiaomi/Oppo) ---
+        binding.btnAutoStart.setOnClickListener {
+            openAutoStartSettings()
+        }
+
         // --- Test Notification Listener ---
         binding.btnTestNotification.setOnClickListener {
             testNotificationListener()
@@ -490,5 +495,47 @@ class MainActivity : AppCompatActivity() {
         val config = Configuration(resources.configuration)
         config.setLocale(locale)
         resources.updateConfiguration(config, resources.displayMetrics)
+    }
+
+    /**
+     * Try to open manufacturer-specific auto-start settings.
+     * Honor/Huawei/Xiaomi/Oppo all have their own auto-start managers.
+     */
+    private fun openAutoStartSettings() {
+        val intents = listOf(
+            // Honor / Huawei
+            Intent().setClassName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
+            Intent().setClassName("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"),
+            Intent().setClassName("com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity"),
+            // Xiaomi
+            Intent().setClassName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
+            // Oppo
+            Intent().setClassName("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"),
+            Intent().setClassName("com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"),
+            // Vivo
+            Intent().setClassName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
+            // Samsung
+            Intent().setClassName("com.samsung.android.lool", "com.samsung.android.sm.battery.ui.BatteryActivity"),
+            // App info (fallback)
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+        )
+
+        for (intent in intents) {
+            try {
+                if (intent.resolveActivity(packageManager) != null) {
+                    startActivity(intent)
+                    return
+                }
+            } catch (_: Exception) {}
+        }
+
+        // If nothing works, show instructions dialog
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.auto_start_dialog_title))
+            .setMessage(getString(R.string.auto_start_dialog_msg))
+            .setPositiveButton("OK", null)
+            .show()
     }
 }

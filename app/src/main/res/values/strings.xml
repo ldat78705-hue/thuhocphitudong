@@ -17,6 +17,9 @@
     <string name="test_notif_fail">❌ Notification listener is NOT connected. Please grant permission.</string>
     <string name="battery_optimize">🔋 Disable Battery Optimization</string>
     <string name="battery_already_disabled">✅ Battery optimization already disabled</string>
+    <string name="auto_start_setting">🔄 Auto-Start Setting</string>
+    <string name="auto_start_dialog_title">Enable Auto-Start</string>
+    <string name="auto_start_dialog_msg">To work after reboot, GachNo needs Auto-Start permission.\n\nGo to: Settings → Apps → GachNo → Auto-Start → Enable\n\nOr: Settings → Battery → App Launch → GachNo → Manual → Enable all</string>
 
     <string name="webhook_url">Webhook URL</string>
     <string name="webhook_params">Params (Body Template)</string>
