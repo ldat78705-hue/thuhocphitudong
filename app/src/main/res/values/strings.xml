@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GachNo</string>
+
+    <!-- Main screen -->
+    <string name="forwarding">Notification Forwarding</string>
+    <string name="status_active">🟢 Active - Forwarding notifications</string>
+    <string name="status_paused">⏸️ Paused - Toggle to start</string>
+    <string name="status_no_permission">🔴 Permission required</string>
+    <string name="grant_permission">Grant Notification Access</string>
+    <string name="permission_granted">✅ Permission Granted</string>
+
+    <string name="webhook_url">Webhook URL</string>
+    <string name="test_webhook">🚀 Test Webhook</string>
+    <string name="testing">Testing…</string>
+    <string name="test_success">✅ Success! HTTP %d</string>
+    <string name="test_failed">❌ Failed: %s</string>
+    <string name="enter_webhook_url">Please enter Webhook URL first</string>
+
+    <string name="app_filter">App Filter</string>
+    <string name="select">Select</string>
+    <string name="all_apps_selected">Monitoring all apps</string>
+    <string name="apps_selected_count">Monitoring %d app(s)</string>
+
+    <string name="logs">Forwarding Logs</string>
+    <string name="clear">Clear</string>
+    <string name="log_count">%d entries</string>
+    <string name="no_logs">No logs yet. Notifications will appear here after being forwarded.</string>
+    <string name="logs_cleared">Logs cleared</string>
+
+    <!-- Permission dialog -->
+    <string name="permission_required">Permission Required</string>
+    <string name="permission_message">GachNo needs Notification Access permission to read and forward app notifications.\n\nPlease enable \"GachNo\" in the Notification Access settings.</string>
+    <string name="go_to_settings">Go to Settings</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- App filter screen -->
+    <string name="select_apps">Select Apps</string>
+    <string name="search_apps">Search apps…</string>
+    <string name="select_all">Select All</string>
+    <string name="deselect_all">Deselect All</string>
+    <string name="monitoring_all">No filter — monitoring all apps</string>
+    <string name="monitoring_count">Monitoring %d app(s)</string>
+    <string name="app_icon">App icon</string>
+</resources>

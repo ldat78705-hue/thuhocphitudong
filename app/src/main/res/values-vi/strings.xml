@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GachNo</string>
+
+    <!-- Màn hình chính -->
+    <string name="forwarding">Chuyển tiếp thông báo</string>
+    <string name="status_active">🟢 Đang hoạt động - Chuyển tiếp thông báo</string>
+    <string name="status_paused">⏸️ Tạm dừng - Bật để bắt đầu</string>
+    <string name="status_no_permission">🔴 Cần cấp quyền truy cập</string>
+    <string name="grant_permission">Cấp quyền đọc thông báo</string>
+    <string name="permission_granted">✅ Đã cấp quyền</string>
+
+    <string name="webhook_url">Địa chỉ Webhook</string>
+    <string name="test_webhook">🚀 Thử Webhook</string>
+    <string name="testing">Đang thử…</string>
+    <string name="test_success">✅ Thành công! HTTP %d</string>
+    <string name="test_failed">❌ Thất bại: %s</string>
+    <string name="enter_webhook_url">Vui lòng nhập địa chỉ Webhook trước</string>
+
+    <string name="app_filter">Lọc ứng dụng</string>
+    <string name="select">Chọn</string>
+    <string name="all_apps_selected">Theo dõi tất cả ứng dụng</string>
+    <string name="apps_selected_count">Đang theo dõi %d ứng dụng</string>
+
+    <string name="logs">Nhật ký chuyển tiếp</string>
+    <string name="clear">Xóa</string>
+    <string name="log_count">%d mục</string>
+    <string name="no_logs">Chưa có nhật ký. Thông báo sẽ xuất hiện ở đây sau khi được chuyển tiếp.</string>
+    <string name="logs_cleared">Đã xóa nhật ký</string>
+
+    <!-- Dialog cấp quyền -->
+    <string name="permission_required">Cần cấp quyền</string>
+    <string name="permission_message">GachNo cần quyền Truy cập thông báo để đọc và chuyển tiếp thông báo từ các ứng dụng.\n\nVui lòng bật \"GachNo\" trong cài đặt Truy cập thông báo.</string>
+    <string name="go_to_settings">Đi tới Cài đặt</string>
+    <string name="cancel">Hủy</string>
+
+    <!-- Màn hình chọn ứng dụng -->
+    <string name="select_apps">Chọn ứng dụng</string>
+    <string name="search_apps">Tìm ứng dụng…</string>
+    <string name="select_all">Chọn tất cả</string>
+    <string name="deselect_all">Bỏ chọn tất cả</string>
+    <string name="monitoring_all">Không lọc — theo dõi tất cả ứng dụng</string>
+    <string name="monitoring_count">Đang theo dõi %d ứng dụng</string>
+    <string name="app_icon">Biểu tượng ứng dụng</string>
+</resources>

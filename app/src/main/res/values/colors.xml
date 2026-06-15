@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary colors -->
+    <color name="accent_primary">#1976D2</color>
+    <color name="accent_primary_dark">#0D47A1</color>
+    <color name="accent_secondary">#26A69A</color>
+
+    <!-- Background -->
+    <color name="bg_primary">#F5F5F5</color>
+    <color name="bg_primary_dark">#121212</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="card_bg_dark">#1E1E1E</color>
+
+    <!-- Text -->
+    <color name="text_primary">#212121</color>
+    <color name="text_primary_dark">#E0E0E0</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_secondary_dark">#AAAAAA</color>
+
+    <!-- Status -->
+    <color name="status_active">#2E7D32</color>
+    <color name="status_paused">#F57C00</color>
+    <color name="status_error">#C62828</color>
+
+    <!-- Log backgrounds -->
+    <color name="log_success_bg">#E8F5E9</color>
+    <color name="log_failed_bg">#FFEBEE</color>
+    <color name="log_pending_bg">#FFF8E1</color>
+</resources>
