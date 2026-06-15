@@ -30,17 +30,12 @@ jobs:
       uses: gradle/actions/setup-gradle@v4
 
     - name: Generate Gradle Wrapper
-      run: gradle wrapper --gradle-version 8.5
-
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
+      run: |
+        gradle wrapper --gradle-version 8.5
+        chmod +x gradlew
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug
-
-    - name: Rename APK
-      run: |
-        cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/GachNo-v${{ github.ref_name || '1.0.0' }}-debug.apk 2>/dev/null || true
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v4
