@@ -6,9 +6,11 @@ import android.content.Intent
 import android.util.Log
 
 /**
- * Starts ForegroundService on boot to keep the process alive.
- * NotificationListenerService auto-starts if permission is granted,
- * but without ForegroundService the process gets killed by Android.
+ * Starts ForegroundService on boot UNCONDITIONALLY.
+ * Don't check isForwardingEnabled here because:
+ * 1. Device-protected storage might not have migrated settings
+ * 2. It's better to start and let the service check later
+ * 3. If user installed app and enabled forwarding, we must honor it
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -18,6 +20,7 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
+        Log.d(TAG, "=== BootReceiver: $action ===")
 
         when (action) {
             Intent.ACTION_BOOT_COMPLETED,
@@ -25,14 +28,22 @@ class BootReceiver : BroadcastReceiver() {
             "android.intent.action.QUICKBOOT_POWERON",
             "com.htc.intent.action.QUICKBOOT_POWERON",
             "android.intent.action.REBOOT" -> {
-                Log.d(TAG, "Boot detected: $action")
-
-                val settings = SettingsManager(context)
-                if (settings.isForwardingEnabled) {
-                    Log.d(TAG, "Forwarding ON - starting ForegroundService")
+                // ALWAYS start ForegroundService on boot
+                // The service itself will check if forwarding is enabled
+                Log.d(TAG, "Starting ForegroundService from boot")
+                try {
                     ForegroundService.start(context)
-                } else {
-                    Log.d(TAG, "Forwarding OFF - not starting service")
+                    Log.d(TAG, "ForegroundService.start() called successfully")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to start ForegroundService: ${e.message}", e)
+                }
+
+                // Also schedule periodic keepalive
+                try {
+                    KeepAliveWorker.schedule(context)
+                    Log.d(TAG, "KeepAliveWorker scheduled")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to schedule KeepAliveWorker: ${e.message}", e)
                 }
             }
         }

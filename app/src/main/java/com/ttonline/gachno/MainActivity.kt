@@ -61,6 +61,7 @@ class MainActivity : AppCompatActivity() {
         // Ensure ForegroundService is running if forwarding is enabled
         if (settings.isForwardingEnabled) {
             ForegroundService.start(this)
+            KeepAliveWorker.schedule(this)
         }
     }
 
@@ -194,8 +195,10 @@ class MainActivity : AppCompatActivity() {
         // Start/stop ForegroundService to keep process alive
         if (isChecked) {
             ForegroundService.start(this)
+            KeepAliveWorker.schedule(this)
         } else {
             ForegroundService.stop(this)
+            KeepAliveWorker.cancel(this)
         }
         updateServiceStatus()
         // Prevent auto-scroll

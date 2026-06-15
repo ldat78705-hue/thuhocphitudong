@@ -52,13 +52,15 @@ class SettingsManager(context: Context) {
     }
 
     private val prefs: SharedPreferences = run {
-        // Use device-protected storage so settings survive direct boot
-        val storageContext = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-            context.createDeviceProtectedStorageContext()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            val deviceContext = context.createDeviceProtectedStorageContext()
+            // Migrate from credential-encrypted storage (v1.6) to device-protected (v1.7+)
+            // This is safe to call multiple times - it only copies if target doesn't exist
+            deviceContext.moveSharedPreferencesFrom(context, PREFS_NAME)
+            deviceContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         } else {
-            context
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         }
-        storageContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
     private val gson = Gson()
 
