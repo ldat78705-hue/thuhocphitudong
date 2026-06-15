@@ -45,7 +45,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text=" v1.0"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:textColor="#B2EBF2"
                         android:layout_marginStart="6dp" />
 
@@ -53,7 +53,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="·"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:textColor="#B2EBF2"
                         android:layout_marginStart="6dp"
                         android:layout_marginEnd="6dp" />
@@ -63,7 +63,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="thaydat.edu.vn"
-                        android:textSize="12sp"
+                        android:textSize="14sp"
                         android:textColor="#E0F7FA"
                         android:textStyle="italic" />
                 </LinearLayout>
@@ -75,7 +75,7 @@
                     android:layout_alignParentEnd="true"
                     android:layout_centerVertical="true"
                     android:text="EN"
-                    android:textSize="12sp"
+                    android:textSize="14sp"
                     android:textColor="#FFFFFF"
                     android:minWidth="48dp"
                     app:cornerRadius="18dp"
@@ -102,7 +102,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/status_paused"
-                    android:textSize="13sp"
+                    android:textSize="14sp"
                     android:textColor="#FFFFFF" />
 
                 <com.google.android.material.materialswitch.MaterialSwitch
@@ -154,7 +154,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="44dp"
                         android:text="@string/grant_permission"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         app:cornerRadius="12dp"
                         app:icon="@android:drawable/ic_lock_lock"
                         app:iconGravity="textStart"
@@ -166,7 +166,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="44dp"
                         android:text="@string/battery_optimize"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:layout_marginTop="6dp"
                         app:cornerRadius="12dp"
                         app:icon="@android:drawable/ic_lock_power_off"
@@ -179,7 +179,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="44dp"
                         android:text="@string/test_notification"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:layout_marginTop="6dp"
                         app:cornerRadius="12dp"
                         style="@style/Widget.Material3.Button.TextButton" />
@@ -227,7 +227,7 @@
                             android:layout_height="wrap_content"
                             android:hint="https://your-server.com/webhook"
                             android:inputType="textUri"
-                            android:textSize="13sp"
+                            android:textSize="14sp"
                             android:maxLines="2" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -236,7 +236,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/webhook_params"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="@color/text_primary"
                         android:layout_marginTop="14dp" />
@@ -245,7 +245,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/webhook_params_hint"
-                        android:textSize="10sp"
+                        android:textSize="14sp"
                         android:textColor="@color/text_secondary"
                         android:layout_marginBottom="4dp"
                         android:layout_marginTop="2dp" />
@@ -264,7 +264,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="textMultiLine"
-                            android:textSize="12sp"
+                            android:textSize="14sp"
                             android:fontFamily="monospace"
                             android:maxLines="5"
                             android:minLines="2" />
@@ -275,7 +275,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/webhook_headers"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="@color/text_primary"
                         android:layout_marginTop="14dp"
@@ -295,7 +295,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="textMultiLine"
-                            android:textSize="12sp"
+                            android:textSize="14sp"
                             android:fontFamily="monospace"
                             android:maxLines="3"
                             android:minLines="1" />
@@ -306,7 +306,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="44dp"
                         android:text="@string/test_webhook"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:layout_marginTop="12dp"
                         app:cornerRadius="12dp"
                         app:icon="@android:drawable/ic_menu_send"
@@ -354,7 +354,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="36dp"
                             android:text="@string/select"
-                            android:textSize="12sp"
+                            android:textSize="14sp"
                             app:cornerRadius="18dp"
                             style="@style/Widget.Material3.Button.TonalButton" />
                     </LinearLayout>
@@ -364,7 +364,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/all_apps_selected"
-                        android:textSize="12sp"
+                        android:textSize="14sp"
                         android:textColor="@color/text_secondary"
                         android:layout_marginTop="4dp" />
                 </LinearLayout>
@@ -399,7 +399,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/test_full_flow_desc"
-                        android:textSize="11sp"
+                        android:textSize="14sp"
                         android:textColor="@color/text_secondary"
                         android:layout_marginBottom="12dp" />
 
@@ -419,7 +419,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="text"
-                            android:textSize="13sp"
+                            android:textSize="14sp"
                             android:maxLines="1" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -440,7 +440,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="text"
-                            android:textSize="13sp"
+                            android:textSize="14sp"
                             android:maxLines="1" />
                     </com.google.android.material.textfield.TextInputLayout>
 
@@ -461,7 +461,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="textMultiLine"
-                            android:textSize="13sp"
+                            android:textSize="14sp"
                             android:maxLines="4"
                             android:minLines="2" />
                     </com.google.android.material.textfield.TextInputLayout>
@@ -471,7 +471,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="44dp"
                         android:text="@string/test_full_flow"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:layout_marginTop="12dp"
                         app:cornerRadius="12dp"
                         app:backgroundTint="@color/accent_secondary"
@@ -481,7 +481,7 @@
                         android:id="@+id/tvTestResult"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textSize="12sp"
+                        android:textSize="14sp"
                         android:textColor="@color/text_secondary"
                         android:layout_marginTop="6dp"
                         android:visibility="gone" />
@@ -523,7 +523,7 @@
                             android:id="@+id/tvLogCount"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textSize="11sp"
+                            android:textSize="14sp"
                             android:textColor="@color/text_secondary"
                             android:layout_marginEnd="8dp" />
 
@@ -532,7 +532,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="32dp"
                             android:text="@string/clear"
-                            android:textSize="11sp"
+                            android:textSize="14sp"
                             app:cornerRadius="16dp"
                             style="@style/Widget.Material3.Button.OutlinedButton" />
                     </LinearLayout>
@@ -542,7 +542,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/no_logs"
-                        android:textSize="13sp"
+                        android:textSize="14sp"
                         android:textColor="@color/text_secondary"
                         android:gravity="center"
                         android:padding="24dp"

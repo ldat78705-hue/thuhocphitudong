@@ -9,12 +9,16 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Prevent Android from killing us in battery optimization (same as SmsForwarder) -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Same as SmsForwarder: declare BIND_NOTIFICATION_LISTENER_SERVICE at manifest level -->
+    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:allowBackup="true"
+        android:defaultToDeviceProtectedStorage="true"
+        android:directBootAware="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -38,9 +42,12 @@
             android:exported="false"
             android:label="@string/select_apps" />
 
+        <!-- NotificationListenerService - matching SmsForwarder exactly -->
         <service
             android:name=".NotifyListenerService"
-            android:exported="true"
+            android:enabled="true"
+            android:exported="false"
+            android:label="@string/app_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
@@ -49,14 +56,19 @@
 
         <service
             android:name=".ForegroundService"
+            android:enabled="true"
             android:exported="false"
             android:stopWithTask="false" />
 
         <receiver
             android:name=".BootReceiver"
-            android:exported="true">
-            <intent-filter>
+            android:defaultToDeviceProtectedStorage="true"
+            android:directBootAware="true"
+            android:exported="true"
+            tools:ignore="IntentFilterExportedReceiver">
+            <intent-filter android:priority="2147483647">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="android.intent.action.REBOOT" />
