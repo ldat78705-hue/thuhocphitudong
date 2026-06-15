@@ -9,6 +9,9 @@
     <string name="status_no_permission">🔴 Permission required</string>
     <string name="grant_permission">Grant Notification Access</string>
     <string name="permission_granted">✅ Permission Granted</string>
+    <string name="test_notification">🔔 Test Notification Listener</string>
+    <string name="test_notif_ok">✅ Notification listener is working!</string>
+    <string name="test_notif_fail">❌ Notification listener is NOT connected. Please grant permission.</string>
 
     <string name="webhook_url">Webhook URL</string>
     <string name="test_webhook">🚀 Test Webhook</string>
@@ -20,6 +23,12 @@
     <string name="app_filter">App Filter</string>
     <string name="select">Select</string>
     <string name="all_apps_selected">Monitoring all apps</string>
+    <string name="test_full_flow">🧪 Test Full Flow (Simulate Bank Notification)</string>
+    <string name="test_flow_running">Testing…</string>
+    <string name="test_flow_success">✅ Full test passed! Simulated notification sent to webhook successfully (HTTP %d)</string>
+    <string name="test_flow_failed">❌ Test failed: %s</string>
+    <string name="test_flow_no_url">❌ Please enter Webhook URL first</string>
+    <string name="test_flow_no_permission">❌ Please grant notification permission first</string>
     <string name="apps_selected_count">Monitoring %d app(s)</string>
 
     <string name="logs">Forwarding Logs</string>

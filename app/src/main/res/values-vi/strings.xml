@@ -9,6 +9,9 @@
     <string name="status_no_permission">🔴 Cần cấp quyền truy cập</string>
     <string name="grant_permission">Cấp quyền đọc thông báo</string>
     <string name="permission_granted">✅ Đã cấp quyền</string>
+    <string name="test_notification">🔔 Kiểm tra quyền đọc thông báo</string>
+    <string name="test_notif_ok">✅ Đang lắng nghe thông báo bình thường!</string>
+    <string name="test_notif_fail">❌ Chưa kết nối. Vui lòng cấp quyền đọc thông báo.</string>
 
     <string name="webhook_url">Địa chỉ Webhook</string>
     <string name="test_webhook">🚀 Thử Webhook</string>
@@ -20,6 +23,12 @@
     <string name="app_filter">Lọc ứng dụng</string>
     <string name="select">Chọn</string>
     <string name="all_apps_selected">Theo dõi tất cả ứng dụng</string>
+    <string name="test_full_flow">🧪 Kiểm tra toàn bộ (Giả lập thông báo ngân hàng)</string>
+    <string name="test_flow_running">Đang kiểm tra…</string>
+    <string name="test_flow_success">✅ Kiểm tra thành công! Đã gửi thông báo giả lập lên webhook (HTTP %d)</string>
+    <string name="test_flow_failed">❌ Kiểm tra thất bại: %s</string>
+    <string name="test_flow_no_url">❌ Vui lòng nhập địa chỉ Webhook trước</string>
+    <string name="test_flow_no_permission">❌ Vui lòng cấp quyền đọc thông báo trước</string>
     <string name="apps_selected_count">Đang theo dõi %d ứng dụng</string>
 
     <string name="logs">Nhật ký chuyển tiếp</string>

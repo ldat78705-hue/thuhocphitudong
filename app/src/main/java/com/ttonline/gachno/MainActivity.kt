@@ -109,6 +109,11 @@ class MainActivity : AppCompatActivity() {
             testWebhook()
         }
 
+        // --- Test Notification Listener ---
+        binding.btnTestNotification.setOnClickListener {
+            testNotificationListener()
+        }
+
         // --- Select Apps Button ---
         binding.btnSelectApps.setOnClickListener {
             startActivity(Intent(this, AppFilterActivity::class.java))
@@ -137,6 +142,11 @@ class MainActivity : AppCompatActivity() {
 
         // --- Show selected apps count ---
         updateSelectedAppsCount()
+
+        // --- Test Full Flow ---
+        binding.btnTestFullFlow.setOnClickListener {
+            testFullFlow()
+        }
     }
 
     private fun updateServiceStatus() {
@@ -231,6 +241,89 @@ class MainActivity : AppCompatActivity() {
                     Toast.LENGTH_LONG
                 ).show()
             }
+        }
+    }
+
+    /**
+     * Test notification listener connection status
+     */
+    private fun testNotificationListener() {
+        val isConnected = isNotificationListenerEnabled()
+        val msg = if (isConnected) {
+            getString(R.string.test_notif_ok)
+        } else {
+            getString(R.string.test_notif_fail)
+        }
+        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+    }
+
+    /**
+     * Test full flow: simulate a bank notification and send it to webhook.
+     * Like SmsForwarder's test feature - creates a fake bank message
+     * and sends it through the same webhook pipeline.
+     */
+    private fun testFullFlow() {
+        // Check permission first
+        if (!isNotificationListenerEnabled()) {
+            binding.tvTestResult.visibility = android.view.View.VISIBLE
+            binding.tvTestResult.text = getString(R.string.test_flow_no_permission)
+            binding.tvTestResult.setTextColor(getColor(R.color.status_error))
+            return
+        }
+
+        // Check webhook URL
+        val url = binding.etWebhookUrl.text.toString().trim()
+        if (url.isBlank()) {
+            binding.tvTestResult.visibility = android.view.View.VISIBLE
+            binding.tvTestResult.text = getString(R.string.test_flow_no_url)
+            binding.tvTestResult.setTextColor(getColor(R.color.status_error))
+            return
+        }
+        settings.webhookUrl = url
+
+        binding.btnTestFullFlow.isEnabled = false
+        binding.tvTestResult.visibility = android.view.View.VISIBLE
+        binding.tvTestResult.text = getString(R.string.test_flow_running)
+        binding.tvTestResult.setTextColor(getColor(R.color.text_secondary))
+
+        // Simulate a bank notification
+        val testAppName = "MB Bank (Test)"
+        val testPackage = "com.mbmobile"
+        val testTitle = "Thông báo giao dịch"
+        val testContent = "TK 0123456789 +500,000 VND lúc ${java.text.SimpleDateFormat("HH:mm dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date())}. SD: 1,200,000 VND. GachNo test."
+
+        // Add log entry
+        val logEntry = LogEntry(
+            appName = testAppName,
+            packageName = testPackage,
+            title = testTitle,
+            content = testContent
+        )
+        settings.addLog(logEntry)
+
+        CoroutineScope(Dispatchers.Main).launch {
+            val result = webhookSender.send(
+                webhookUrl = url,
+                appName = testAppName,
+                packageName = testPackage,
+                title = testTitle,
+                content = testContent,
+                deviceName = settings.deviceName
+            )
+
+            binding.btnTestFullFlow.isEnabled = true
+
+            if (result.success) {
+                settings.updateLog(logEntry.id, LogEntry.Status.SUCCESS, result.responseCode)
+                binding.tvTestResult.text = getString(R.string.test_flow_success, result.responseCode)
+                binding.tvTestResult.setTextColor(getColor(R.color.status_active))
+            } else {
+                settings.updateLog(logEntry.id, LogEntry.Status.FAILED, result.responseCode, result.errorMessage)
+                binding.tvTestResult.text = getString(R.string.test_flow_failed, result.errorMessage)
+                binding.tvTestResult.setTextColor(getColor(R.color.status_error))
+            }
+
+            refreshLogs()
         }
     }
 
