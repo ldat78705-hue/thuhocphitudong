@@ -12,3 +12,6 @@ local.properties
 *.apk
 *.ap_
 *.aab
+*.zip
+*.log
+
