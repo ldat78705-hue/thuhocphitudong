@@ -1,0 +1,70 @@
+﻿2026-06-15T13:57:37.6486802Z ##[group]Run gradle assembleDebug
+2026-06-15T13:57:37.6487272Z [36;1mgradle assembleDebug[0m
+2026-06-15T13:57:38.0475861Z shell: /usr/bin/bash -e {0}
+2026-06-15T13:57:38.0476265Z env:
+2026-06-15T13:57:38.0476670Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64
+2026-06-15T13:57:38.0477257Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64
+2026-06-15T13:57:38.0477749Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-06-15T13:57:38.0478160Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-06-15T13:57:38.0478552Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-06-15T13:57:38.0478935Z   GRADLE_USER_HOME: /home/runner/.gradle
+2026-06-15T13:57:38.0479292Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-06-15T13:57:38.0479655Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-06-15T13:57:38.0480170Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-06-15T13:57:38.0480715Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-06-15T13:57:38.0481197Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-06-15T13:57:38.0481544Z ##[endgroup]
+2026-06-15T13:57:38.6387316Z Starting a Gradle Daemon (subsequent builds will be faster)
+2026-06-15T13:57:48.3486045Z > Task :app:preBuild UP-TO-DATE
+2026-06-15T13:57:48.3525799Z > Task :app:preDebugBuild UP-TO-DATE
+2026-06-15T13:57:48.3545564Z > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+2026-06-15T13:57:48.3585411Z > Task :app:checkKotlinGradlePluginConfigurationErrors
+2026-06-15T13:57:48.8400538Z > Task :app:dataBindingMergeDependencyArtifactsDebug
+2026-06-15T13:57:48.8425758Z > Task :app:generateDebugResValues
+2026-06-15T13:57:48.8445458Z > Task :app:generateDebugResources
+2026-06-15T13:57:50.9382956Z > Task :app:packageDebugResources
+2026-06-15T13:57:51.9385026Z > Task :app:mergeDebugResources
+2026-06-15T13:57:52.6420672Z > Task :app:parseDebugLocalResources
+2026-06-15T13:57:52.6421954Z > Task :app:mapDebugSourceSetPaths
+2026-06-15T13:57:52.6422909Z > Task :app:checkDebugAarMetadata
+2026-06-15T13:57:52.9383686Z > Task :app:dataBindingGenBaseClassesDebug
+2026-06-15T13:57:52.9424151Z > Task :app:createDebugCompatibleScreenManifests
+2026-06-15T13:57:52.9448820Z > Task :app:extractDeepLinksDebug
+2026-06-15T13:57:53.1383014Z > Task :app:processDebugMainManifest
+2026-06-15T13:57:53.2394522Z > Task :app:processDebugManifest
+2026-06-15T13:57:53.2399580Z > Task :app:javaPreCompileDebug
+2026-06-15T13:57:53.3387230Z > Task :app:mergeDebugShaders
+2026-06-15T13:57:53.3398078Z > Task :app:compileDebugShaders NO-SOURCE
+2026-06-15T13:57:53.3402008Z > Task :app:generateDebugAssets UP-TO-DATE
+2026-06-15T13:57:53.3402975Z > Task :app:mergeDebugAssets
+2026-06-15T13:57:53.3411699Z > Task :app:compressDebugAssets
+2026-06-15T13:57:53.3412689Z > Task :app:desugarDebugFileDependencies
+2026-06-15T13:57:53.5395933Z > Task :app:mergeDebugJniLibFolders
+2026-06-15T13:57:53.5435826Z > Task :app:checkDebugDuplicateClasses
+2026-06-15T13:57:53.5465490Z > Task :app:mergeDebugNativeLibs NO-SOURCE
+2026-06-15T13:57:53.6436055Z > Task :app:stripDebugDebugSymbols NO-SOURCE
+2026-06-15T13:57:53.6445438Z > Task :app:processDebugManifestForPackage
+2026-06-15T13:57:53.7386057Z > Task :app:mergeLibDexDebug
+2026-06-15T13:57:55.2397600Z > Task :app:processDebugResources
+2026-06-15T13:57:55.6386246Z > Task :app:validateSigningDebug
+2026-06-15T13:57:56.5387483Z > Task :app:writeDebugAppMetadata
+2026-06-15T13:57:56.5415363Z > Task :app:writeDebugSigningConfigVersions
+2026-06-15T13:58:00.0382591Z > Task :app:mergeExtDexDebug
+2026-06-15T13:58:10.3405002Z 
+2026-06-15T13:58:10.3435788Z > Task :app:compileDebugKotlin
+2026-06-15T13:58:10.3466908Z w: file:///home/runner/work/thuhocphitudong/thuhocphitudong/app/src/main/java/com/ttonline/gachno/MainActivity.kt:460:19 'updateConfiguration(Configuration!, DisplayMetrics!): Unit' is deprecated. Deprecated in Java
+2026-06-15T13:58:10.3469575Z w: file:///home/runner/work/thuhocphitudong/thuhocphitudong/app/src/main/java/com/ttonline/gachno/WebhookSender.kt:88:63 Parameter 'body' is never used
+2026-06-15T13:58:12.5399932Z 
+2026-06-15T13:58:12.5419074Z > Task :app:compileDebugJavaWithJavac
+2026-06-15T13:58:14.2415994Z > Task :app:dexBuilderDebug
+2026-06-15T13:58:14.3390166Z > Task :app:mergeDebugGlobalSynthetics
+2026-06-15T13:58:14.3405389Z > Task :app:processDebugJavaRes
+2026-06-15T13:58:14.6383519Z > Task :app:mergeProjectDexDebug
+2026-06-15T13:58:14.9400106Z > Task :app:mergeDebugJavaResource
+2026-06-15T13:58:15.4413624Z > Task :app:packageDebug
+2026-06-15T13:58:15.4445599Z > Task :app:createDebugApkListingFileRedirect
+2026-06-15T13:58:15.4446631Z > Task :app:assembleDebug
+2026-06-15T13:58:15.4448164Z gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1781531862362.json
+2026-06-15T13:58:15.4449090Z 
+2026-06-15T13:58:15.4449477Z BUILD SUCCESSFUL in 37s
+2026-06-15T13:58:15.4450131Z 36 actionable tasks: 36 executed

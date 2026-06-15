@@ -1,0 +1,79 @@
+﻿2026-06-15T13:58:15.8313192Z ##[group]Run gradle assembleRelease
+2026-06-15T13:58:15.8313824Z [36;1mgradle assembleRelease[0m
+2026-06-15T13:58:15.8358036Z shell: /usr/bin/bash -e {0}
+2026-06-15T13:58:15.8358391Z env:
+2026-06-15T13:58:15.8358786Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64
+2026-06-15T13:58:15.8359375Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64
+2026-06-15T13:58:15.8359855Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-06-15T13:58:15.8360220Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-06-15T13:58:15.8360605Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-06-15T13:58:15.8361007Z   GRADLE_USER_HOME: /home/runner/.gradle
+2026-06-15T13:58:15.8361360Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-06-15T13:58:15.8361726Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-06-15T13:58:15.8362242Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-06-15T13:58:15.8362784Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-06-15T13:58:15.8363214Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-06-15T13:58:15.8363550Z ##[endgroup]
+2026-06-15T13:58:17.2367201Z > Task :app:buildKotlinToolingMetadata
+2026-06-15T13:58:17.2415735Z > Task :app:checkKotlinGradlePluginConfigurationErrors
+2026-06-15T13:58:17.2445265Z > Task :app:preBuild UP-TO-DATE
+2026-06-15T13:58:17.2467029Z > Task :app:preReleaseBuild UP-TO-DATE
+2026-06-15T13:58:17.3335918Z > Task :app:dataBindingMergeDependencyArtifactsRelease
+2026-06-15T13:58:17.3362999Z > Task :app:generateReleaseResValues
+2026-06-15T13:58:17.3363777Z > Task :app:generateReleaseResources
+2026-06-15T13:58:18.1368746Z > Task :app:packageReleaseResources
+2026-06-15T13:58:18.3329088Z > Task :app:parseReleaseLocalResources
+2026-06-15T13:58:18.3345456Z > Task :app:checkReleaseAarMetadata
+2026-06-15T13:58:18.3375726Z > Task :app:mapReleaseSourceSetPaths
+2026-06-15T13:58:18.3405275Z > Task :app:createReleaseCompatibleScreenManifests
+2026-06-15T13:58:18.3406303Z > Task :app:extractDeepLinksRelease
+2026-06-15T13:58:18.4338564Z > Task :app:processReleaseMainManifest
+2026-06-15T13:58:18.4355578Z > Task :app:processReleaseManifest
+2026-06-15T13:58:18.5335767Z > Task :app:javaPreCompileRelease
+2026-06-15T13:58:18.5365229Z > Task :app:extractProguardFiles
+2026-06-15T13:58:18.5388578Z > Task :app:mergeReleaseJniLibFolders
+2026-06-15T13:58:18.5401719Z > Task :app:mergeReleaseNativeLibs NO-SOURCE
+2026-06-15T13:58:18.5425306Z > Task :app:stripReleaseDebugSymbols NO-SOURCE
+2026-06-15T13:58:18.5435658Z > Task :app:extractReleaseNativeSymbolTables NO-SOURCE
+2026-06-15T13:58:18.5436724Z > Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+2026-06-15T13:58:18.5442289Z > Task :app:desugarReleaseFileDependencies
+2026-06-15T13:58:18.5443408Z > Task :app:checkReleaseDuplicateClasses
+2026-06-15T13:58:18.7347958Z > Task :app:processReleaseManifestForPackage
+2026-06-15T13:58:18.7371931Z > Task :app:mergeReleaseArtProfile
+2026-06-15T13:58:18.7425403Z > Task :app:mergeReleaseResources
+2026-06-15T13:58:38.8335793Z > Task :app:dataBindingGenBaseClassesRelease
+2026-06-15T13:58:38.8365920Z > Task :app:mergeReleaseShaders
+2026-06-15T13:58:38.8385473Z > Task :app:compileReleaseShaders NO-SOURCE
+2026-06-15T13:58:38.8425104Z > Task :app:generateReleaseAssets UP-TO-DATE
+2026-06-15T13:58:38.8454950Z > Task :app:mergeReleaseAssets
+2026-06-15T13:58:38.8484923Z > Task :app:compressReleaseAssets
+2026-06-15T13:58:38.9355844Z > Task :app:collectReleaseDependencies
+2026-06-15T13:58:39.1335734Z > Task :app:sdkReleaseDependencyData
+2026-06-15T13:58:39.1354636Z > Task :app:writeReleaseAppMetadata
+2026-06-15T13:58:39.1395565Z > Task :app:writeReleaseSigningConfigVersions
+2026-06-15T13:58:39.8368899Z > Task :app:processReleaseResources
+2026-06-15T13:58:40.3327359Z > Task :app:optimizeReleaseResources
+2026-06-15T13:58:42.2345934Z > Task :app:mergeExtDexRelease
+2026-06-15T13:58:45.9325771Z 
+2026-06-15T13:58:45.9332066Z > Task :app:compileReleaseKotlin
+2026-06-15T13:58:45.9334869Z w: file:///home/runner/work/thuhocphitudong/thuhocphitudong/app/src/main/java/com/ttonline/gachno/MainActivity.kt:460:19 'updateConfiguration(Configuration!, DisplayMetrics!): Unit' is deprecated. Deprecated in Java
+2026-06-15T13:58:45.9338159Z w: file:///home/runner/work/thuhocphitudong/thuhocphitudong/app/src/main/java/com/ttonline/gachno/WebhookSender.kt:88:63 Parameter 'body' is never used
+2026-06-15T13:58:46.2320858Z 
+2026-06-15T13:58:46.2323837Z > Task :app:compileReleaseJavaWithJavac
+2026-06-15T13:58:47.2322261Z > Task :app:generateReleaseLintVitalReportModel
+2026-06-15T13:58:53.3322426Z > Task :app:dexBuilderRelease
+2026-06-15T13:58:53.5345935Z > Task :app:mergeReleaseGlobalSynthetics
+2026-06-15T13:58:53.5375150Z > Task :app:processReleaseJavaRes
+2026-06-15T13:58:54.0325883Z > Task :app:mergeReleaseJavaResource
+2026-06-15T13:58:55.7322080Z > Task :app:mergeDexRelease
+2026-06-15T13:58:56.0322368Z > Task :app:compileReleaseArtProfile
+2026-06-15T13:58:56.8322021Z > Task :app:packageRelease
+2026-06-15T13:58:56.8324782Z > Task :app:createReleaseApkListingFileRedirect
+2026-06-15T13:59:04.8338652Z > Task :app:lintVitalAnalyzeRelease
+2026-06-15T13:59:04.8353655Z > Task :app:lintVitalReportRelease
+2026-06-15T13:59:04.8354866Z > Task :app:lintVitalRelease
+2026-06-15T13:59:04.8355650Z > Task :app:assembleRelease
+2026-06-15T13:59:04.8357029Z gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1781531896443.json
+2026-06-15T13:59:04.8358025Z 
+2026-06-15T13:59:04.8358450Z BUILD SUCCESSFUL in 48s
+2026-06-15T13:59:04.8359152Z 45 actionable tasks: 45 executed

@@ -1,0 +1,17 @@
+﻿2026-06-15T13:59:04.9089444Z ##[group]Run mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/GachNo-v1.0.0-debug.apk || true
+2026-06-15T13:59:04.9091216Z [36;1mmv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/GachNo-v1.0.0-debug.apk || true[0m
+2026-06-15T13:59:04.9092709Z [36;1mmv app/build/outputs/apk/release/app-release-unsigned.apk app/build/outputs/apk/release/GachNo-v1.0.0-release.apk || true[0m
+2026-06-15T13:59:04.9143941Z shell: /usr/bin/bash -e {0}
+2026-06-15T13:59:04.9144923Z env:
+2026-06-15T13:59:04.9145512Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64
+2026-06-15T13:59:04.9146443Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64
+2026-06-15T13:59:04.9147171Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-06-15T13:59:04.9147721Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-06-15T13:59:04.9148319Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-06-15T13:59:04.9148879Z   GRADLE_USER_HOME: /home/runner/.gradle
+2026-06-15T13:59:04.9149508Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-06-15T13:59:04.9150075Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-06-15T13:59:04.9150866Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-06-15T13:59:04.9151676Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-06-15T13:59:04.9152287Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-06-15T13:59:04.9152827Z ##[endgroup]

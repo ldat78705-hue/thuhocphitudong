@@ -1,0 +1,47 @@
+﻿2026-06-15T13:59:07.4539256Z ##[group]Run softprops/action-gh-release@v2
+2026-06-15T13:59:07.4539673Z with:
+2026-06-15T13:59:07.4539938Z   name: GachNo v1.0.0
+2026-06-15T13:59:07.4541857Z   body: ## GachNo v1.0.0
+
+Ứng dụng chuyển tiếp thông báo ngân hàng qua webhook để gạch nợ học phí tự động.
+
+### Tính năng chính:
+- 🔔 Lắng nghe thông báo từ app ngân hàng
+- 🚀 Chuyển tiếp tự động qua Webhook (HTTP POST)
+- 📝 Cấu hình Params body template linh hoạt
+- 🔋 Tối ưu pin, chạy ngầm 24/24
+- 🧪 Test gửi thử với nội dung tùy chỉnh
+- 🌐 Hỗ trợ Tiếng Việt / English
+
+### Cài đặt:
+1. Tải file `GachNo-v1.0.0-release.apk`
+2. Cài đặt trên điện thoại Android (bật "Nguồn không xác định")
+3. Cấp quyền Notification Access
+4. Nhập Webhook URL và bấm Bật chuyển tiếp
+
+2026-06-15T13:59:07.4543900Z   files: app/build/outputs/apk/debug/GachNo-*.apk
+app/build/outputs/apk/release/GachNo-*.apk
+
+2026-06-15T13:59:07.4544719Z   generate_release_notes: false
+2026-06-15T13:59:07.4545058Z   overwrite_files: true
+2026-06-15T13:59:07.4548294Z   token: ***
+2026-06-15T13:59:07.4548626Z env:
+2026-06-15T13:59:07.4549011Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64
+2026-06-15T13:59:07.4549602Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64
+2026-06-15T13:59:07.4550088Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-06-15T13:59:07.4550474Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-06-15T13:59:07.4550894Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-06-15T13:59:07.4551288Z   GRADLE_USER_HOME: /home/runner/.gradle
+2026-06-15T13:59:07.4551653Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-06-15T13:59:07.4552029Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-06-15T13:59:07.4552567Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-06-15T13:59:07.4553330Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-06-15T13:59:07.4553728Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-06-15T13:59:07.4557237Z   GITHUB_TOKEN: ***
+2026-06-15T13:59:07.4557544Z ##[endgroup]
+2026-06-15T13:59:07.8278353Z 👩‍🏭 Creating new GitHub release for tag v1.0.0...
+2026-06-15T13:59:07.9682635Z ⚠️ GitHub release failed with status: 403
+2026-06-15T13:59:07.9684252Z {"message":"Resource not accessible by integration","documentation_url":"https://docs.github.com/rest/releases/releases#create-a-release","status":"403"}
+2026-06-15T13:59:07.9686171Z Skip retry — your GitHub token/PAT does not have the required permission to create a release
+2026-06-15T13:59:07.9687648Z ⚠️ Unexpected error fetching GitHub release for tag refs/tags/v1.0.0: HttpError: Resource not accessible by integration - https://docs.github.com/rest/releases/releases#create-a-release
+2026-06-15T13:59:07.9709390Z ##[error]Resource not accessible by integration - https://docs.github.com/rest/releases/releases#create-a-release

@@ -1,0 +1,32 @@
+﻿2026-06-15T13:59:04.9362982Z ##[group]Run actions/upload-artifact@v4
+2026-06-15T13:59:04.9363364Z with:
+2026-06-15T13:59:04.9363632Z   name: GachNo-v1.0.0-debug
+2026-06-15T13:59:04.9363968Z   path: app/build/outputs/apk/debug/*.apk
+2026-06-15T13:59:04.9364312Z   if-no-files-found: warn
+2026-06-15T13:59:04.9364929Z   compression-level: 6
+2026-06-15T13:59:04.9365344Z   overwrite: false
+2026-06-15T13:59:04.9365720Z   include-hidden-files: false
+2026-06-15T13:59:04.9366015Z env:
+2026-06-15T13:59:04.9366373Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64
+2026-06-15T13:59:04.9366947Z   JAVA_HOME_17_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64
+2026-06-15T13:59:04.9367400Z   ANDROID_HOME: /usr/local/lib/android/sdk
+2026-06-15T13:59:04.9367756Z   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+2026-06-15T13:59:04.9368128Z   GRADLE_ACTION_ID: gradle/actions/setup-gradle
+2026-06-15T13:59:04.9368489Z   GRADLE_USER_HOME: /home/runner/.gradle
+2026-06-15T13:59:04.9368833Z   GRADLE_BUILD_ACTION_SETUP_COMPLETED: true
+2026-06-15T13:59:04.9369232Z   GRADLE_BUILD_ACTION_CACHE_RESTORED: true
+2026-06-15T13:59:04.9369741Z   DEVELOCITY_INJECTION_INIT_SCRIPT_NAME: gradle-actions.inject-develocity.init.gradle
+2026-06-15T13:59:04.9370285Z   DEVELOCITY_INJECTION_CUSTOM_VALUE: gradle-actions
+2026-06-15T13:59:04.9370666Z   GITHUB_DEPENDENCY_GRAPH_ENABLED: false
+2026-06-15T13:59:04.9370993Z ##[endgroup]
+2026-06-15T13:59:05.1728670Z With the provided path, there will be 1 file uploaded
+2026-06-15T13:59:05.1733325Z Artifact name is valid!
+2026-06-15T13:59:05.1734573Z Root directory input is valid!
+2026-06-15T13:59:05.4413367Z Beginning upload of artifact content to blob storage
+2026-06-15T13:59:05.8732979Z Uploaded bytes 5506208
+2026-06-15T13:59:05.8922140Z Finished uploading artifact content to blob storage!
+2026-06-15T13:59:05.8925080Z SHA256 digest of uploaded artifact zip is 6c9a394786c163079b2b838a5393b3039e273cf4116bc8b3443a8ab3223e6634
+2026-06-15T13:59:05.8927039Z Finalizing artifact upload
+2026-06-15T13:59:06.2797726Z Artifact GachNo-v1.0.0-debug.zip successfully finalized. Artifact ID 7640288712
+2026-06-15T13:59:06.2798810Z Artifact GachNo-v1.0.0-debug has been successfully uploaded! Final size is 5506208 bytes. Artifact ID is 7640288712
+2026-06-15T13:59:06.2805182Z Artifact download URL: https://github.com/ldat78705-hue/thuhocphitudong/actions/runs/27551366618/artifacts/7640288712
