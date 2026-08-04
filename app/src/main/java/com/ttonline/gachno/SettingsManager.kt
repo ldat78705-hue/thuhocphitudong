@@ -160,42 +160,55 @@ class SettingsManager(context: Context) {
 
     // --- Duplicate Detection ---
     /**
-     * Detects true duplicate notifications from Android re-posting.
+     * Detects true duplicate notifications.
      * 
-     * Key insight: when 1 parent pays for 2 students with the same amount,
-     * the notification TITLE and CONTENT may be identical, but the notification
-     * KEY (from StatusBarNotification.key) or postTime will differ.
+     * Uses a combination of notifKey + postTime + content hash as fingerprint.
+     * Keeps last 20 fingerprints. Only skips if EXACT SAME fingerprint seen
+     * within the interval window.
      * 
-     * We only skip if ALL of these match within the interval:
-     * - Same notification key (Android's unique ID per notification)
-     * - Same postTime (timestamp from Android, not our clock)
-     * - Within duplicate interval
-     * 
-     * This means: same content from different notification events = NOT duplicate
+     * This correctly handles:
+     * - 1 PH paying for 2 HS (different content → different fingerprint → both forwarded)
+     * - Android re-posting same notification (same key+postTime+content → same fingerprint → skipped)
+     * - Same PH paying same amount for 2 HS (same content BUT different key/postTime → both forwarded)
      */
     fun isDuplicate(packageName: String, title: String, content: String, 
                     notifKey: String, postTime: Long): Boolean {
         val interval = duplicateInterval
         if (interval <= 0) return false
 
-        // Use notification key + postTime as the unique identifier
-        // This is what Android uses to identify a specific notification
-        val uniqueId = "$notifKey|$postTime"
-        val hash = uniqueId.hashCode()
-        
-        val lastHash = prefs.getInt(KEY_LAST_NOTIFY_HASH, 0)
-        val lastTime = prefs.getLong(KEY_LAST_NOTIFY_TIME, 0)
         val now = System.currentTimeMillis()
+        // Fingerprint = key + postTime + content hash (all 3 must match to be duplicate)
+        val fingerprint = "$notifKey|$postTime|${content.hashCode()}"
 
-        if (hash == lastHash && (now - lastTime) < interval * 1000L) {
-            return true
+        // Load recent fingerprints
+        val recentJson = prefs.getString("recent_notif_fps", "") ?: ""
+        val recentList = if (recentJson.isNotEmpty()) {
+            recentJson.split(";;;").mapNotNull { entry ->
+                val parts = entry.split("@@@")
+                if (parts.size == 2) Pair(parts[0], parts[1].toLongOrNull() ?: 0L) else null
+            }.toMutableList()
+        } else {
+            mutableListOf()
         }
 
-        prefs.edit()
-            .putInt(KEY_LAST_NOTIFY_HASH, hash)
-            .putLong(KEY_LAST_NOTIFY_TIME, now)
-            .apply()
-        return false
+        // Clean expired entries
+        recentList.removeAll { (now - it.second) > interval * 1000L }
+
+        // Check if this fingerprint was seen recently
+        val isDup = recentList.any { it.first == fingerprint }
+        
+        if (!isDup) {
+            // Add new fingerprint
+            recentList.add(Pair(fingerprint, now))
+            // Keep only last 20
+            while (recentList.size > 20) recentList.removeAt(0)
+        }
+
+        // Save back
+        val newJson = recentList.joinToString(";;;") { "${it.first}@@@${it.second}" }
+        prefs.edit().putString("recent_notif_fps", newJson).apply()
+
+        return isDup
     }
 
     /**
