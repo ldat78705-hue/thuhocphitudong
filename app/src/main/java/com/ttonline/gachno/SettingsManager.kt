@@ -97,7 +97,16 @@ class SettingsManager(context: Context) {
 
     // --- Duplicate Filter Interval (seconds, 0 = disabled) ---
     var duplicateInterval: Int
-        get() = prefs.getInt(KEY_DUPLICATE_INTERVAL, 30)
+        get() {
+            val v = prefs.getInt(KEY_DUPLICATE_INTERVAL, 5)
+            // Migrate: old versions had 30s default which is too aggressive
+            // with the new key+postTime detection, 5s is sufficient
+            if (v == 30) {
+                duplicateInterval = 5
+                return 5
+            }
+            return v
+        }
         set(value) = prefs.edit().putInt(KEY_DUPLICATE_INTERVAL, value).apply()
 
     // --- Retry Times ---
