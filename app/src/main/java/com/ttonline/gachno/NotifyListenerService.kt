@@ -149,8 +149,9 @@ class NotifyListenerService : NotificationListenerService() {
             return
         }
 
-        // Duplicate check
-        if (settings.isDuplicate(packageName, title, text)) {
+        // Duplicate check - include notification key to differentiate 
+        // same-content notifications (e.g. 1 parent paying for 2 students)
+        if (settings.isDuplicate(packageName, title, text, sbn.key, sbn.postTime)) {
             Log.d(TAG, "<<< SKIP: duplicate")
             return
         }

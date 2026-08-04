@@ -150,11 +150,30 @@ class SettingsManager(context: Context) {
     }
 
     // --- Duplicate Detection ---
-    fun isDuplicate(packageName: String, title: String, content: String): Boolean {
+    /**
+     * Detects true duplicate notifications from Android re-posting.
+     * 
+     * Key insight: when 1 parent pays for 2 students with the same amount,
+     * the notification TITLE and CONTENT may be identical, but the notification
+     * KEY (from StatusBarNotification.key) or postTime will differ.
+     * 
+     * We only skip if ALL of these match within the interval:
+     * - Same notification key (Android's unique ID per notification)
+     * - Same postTime (timestamp from Android, not our clock)
+     * - Within duplicate interval
+     * 
+     * This means: same content from different notification events = NOT duplicate
+     */
+    fun isDuplicate(packageName: String, title: String, content: String, 
+                    notifKey: String, postTime: Long): Boolean {
         val interval = duplicateInterval
         if (interval <= 0) return false
 
-        val hash = "$packageName|$title|$content".hashCode()
+        // Use notification key + postTime as the unique identifier
+        // This is what Android uses to identify a specific notification
+        val uniqueId = "$notifKey|$postTime"
+        val hash = uniqueId.hashCode()
+        
         val lastHash = prefs.getInt(KEY_LAST_NOTIFY_HASH, 0)
         val lastTime = prefs.getLong(KEY_LAST_NOTIFY_TIME, 0)
         val now = System.currentTimeMillis()
