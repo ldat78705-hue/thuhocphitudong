@@ -575,9 +575,25 @@ class MainActivity : AppCompatActivity() {
                 runSetupStep()
             }
             SETUP_STEP_DONE -> {
-                // Check if listener was just enabled
+                // Returned from notification listener settings
                 if (isNotificationListenerEnabled()) {
-                    finishSetup()
+                    if (!settings.isSetupCompleted) {
+                        finishSetup()
+                    }
+                } else if (!settings.isSetupCompleted) {
+                    // User returned without enabling - gentle reminder
+                    AlertDialog.Builder(this)
+                        .setTitle(getString(R.string.permission_required))
+                        .setMessage(getString(R.string.setup_listener_message))
+                        .setPositiveButton(getString(R.string.go_to_settings)) { _, _ ->
+                            openNotificationListenerSettings()
+                        }
+                        .setNegativeButton(getString(R.string.cancel)) { _, _ ->
+                            // User explicitly skips - mark setup done to stop nagging
+                            settings.isSetupCompleted = true
+                            setupPendingStep = SETUP_STEP_DONE
+                        }
+                        .show()
                 }
             }
         }
