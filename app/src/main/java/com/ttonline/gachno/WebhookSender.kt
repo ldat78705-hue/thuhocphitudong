@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.PowerManager
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -28,6 +27,31 @@ class WebhookSender {
 
     companion object {
         private const val TAG = "GachNo_Webhook"
+        // Singleton client - OkHttp is designed to be shared
+        // Creating a new client per request leaks connections and thread pools
+        @Volatile
+        private var sharedClient: OkHttpClient? = null
+        private var clientTimeout: Long = 0L
+
+        private fun getClient(timeoutSeconds: Long): OkHttpClient {
+            val existing = sharedClient
+            if (existing != null && clientTimeout == timeoutSeconds) return existing
+            synchronized(this) {
+                val check = sharedClient
+                if (check != null && clientTimeout == timeoutSeconds) return check
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                    .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                    .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                    .retryOnConnectionFailure(true)
+                    .build()
+                // Shutdown old client's connection pool
+                sharedClient?.connectionPool?.evictAll()
+                sharedClient = client
+                clientTimeout = timeoutSeconds
+                return client
+            }
+        }
     }
 
     data class WebhookResult(
@@ -35,18 +59,6 @@ class WebhookSender {
         val responseCode: Int = 0,
         val errorMessage: String = ""
     )
-
-    /**
-     * Build OkHttpClient with dynamic timeout.
-     */
-    private fun buildClient(timeoutSeconds: Long): OkHttpClient {
-        return OkHttpClient.Builder()
-            .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
-            .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
-            .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .build()
-    }
 
     /**
      * Replace template placeholders in params body.
@@ -113,7 +125,6 @@ class WebhookSender {
         deviceName: String,
         context: Context? = null,
         timeoutSeconds: Long = 15L,
-        maxRetries: Int = 1,
         paramsTemplate: String = """{"text": "[title] [content]"}""",
         headers: Map<String, String> = mapOf("Content-Type" to "application/json")
     ): WebhookResult = withContext(Dispatchers.IO) {
@@ -133,7 +144,7 @@ class WebhookSender {
                 wakeLock.acquire(60 * 1000L)
             }
 
-            val client = buildClient(timeoutSeconds)
+            val client = getClient(timeoutSeconds)
             val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault())
             val timestamp = sdf.format(Date())
 
@@ -143,54 +154,39 @@ class WebhookSender {
 
             Log.d(TAG, "Body: $bodyStr")
 
-            var lastError = ""
-            var lastCode = 0
+            try {
+                val requestBody = bodyStr.toRequestBody(mediaType)
+                val requestBuilder = Request.Builder()
+                    .url(webhookUrl)
+                    .post(requestBody)
+                    .addHeader("User-Agent", "GachNo/1.9")
 
-            for (attempt in 0..maxRetries) {
-                try {
-                    val requestBody = bodyStr.toRequestBody(mediaType)
-                    val requestBuilder = Request.Builder()
-                        .url(webhookUrl)
-                        .post(requestBody)
-                        .addHeader("User-Agent", "GachNo/1.9")
-
-                    // Add custom headers (skip Content-Type as it's set by media type)
-                    headers.forEach { (key, value) ->
-                        if (!key.equals("Content-Type", ignoreCase = true)) {
-                            requestBuilder.addHeader(key, value)
-                        }
+                // Add custom headers (skip Content-Type as it's set by media type)
+                headers.forEach { (key, value) ->
+                    if (!key.equals("Content-Type", ignoreCase = true)) {
+                        requestBuilder.addHeader(key, value)
                     }
-
-                    val request = requestBuilder.build()
-
-                    Log.d(TAG, "Sending webhook (attempt ${attempt + 1}/${maxRetries + 1}): $webhookUrl")
-
-                    val response = client.newCall(request).execute()
-                    val code = response.code
-                    response.close()
-
-                    if (code in 200..299) {
-                        Log.d(TAG, "Webhook success: HTTP $code")
-                        return@withContext WebhookResult(true, code)
-                    } else {
-                        lastCode = code
-                        lastError = "HTTP $code"
-                        Log.w(TAG, "Webhook non-success: HTTP $code")
-                    }
-                } catch (e: Exception) {
-                    lastError = e.message ?: "Unknown error"
-                    lastCode = 0
-                    Log.e(TAG, "Webhook error (attempt ${attempt + 1}): $lastError")
                 }
 
-                if (attempt < maxRetries) {
-                    val delayMs = (attempt + 1) * 2000L
-                    Log.d(TAG, "Retrying in ${delayMs}ms...")
-                    delay(delayMs)
+                val request = requestBuilder.build()
+                Log.d(TAG, "Sending webhook: $webhookUrl")
+
+                val response = client.newCall(request).execute()
+                val code = response.code
+                response.close()
+
+                if (code in 200..299) {
+                    Log.d(TAG, "Webhook success: HTTP $code")
+                    return@withContext WebhookResult(true, code)
+                } else {
+                    Log.w(TAG, "Webhook non-success: HTTP $code")
+                    return@withContext WebhookResult(false, code, "HTTP $code")
                 }
+            } catch (e: Exception) {
+                val error = e.message ?: "Unknown error"
+                Log.e(TAG, "Webhook error: $error")
+                return@withContext WebhookResult(false, 0, error)
             }
-
-            return@withContext WebhookResult(false, lastCode, lastError)
         } finally {
             try {
                 wakeLock?.let {

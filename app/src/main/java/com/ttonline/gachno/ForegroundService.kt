@@ -107,6 +107,21 @@ class ForegroundService : Service() {
     }
 
     /**
+     * Called when user swipes app from recent apps.
+     * Re-enqueue keepalive to ensure service restarts.
+     * Critical for Samsung/Honor/Xiaomi devices.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.d(TAG, "Task removed (user swiped) - scheduling restart")
+        try {
+            KeepAliveWorker.schedule(applicationContext)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to schedule restart: ${e.message}")
+        }
+    }
+
+    /**
      * Toggle the NotificationListenerService component to force Android rebind.
      * This is THE critical trick from SmsForwarder:
      * - Disable component → Android unbinds listener

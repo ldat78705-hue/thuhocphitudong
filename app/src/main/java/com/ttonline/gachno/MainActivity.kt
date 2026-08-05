@@ -322,7 +322,6 @@ class MainActivity : AppCompatActivity() {
                 deviceName = settings.deviceName,
                 context = this@MainActivity,
                 timeoutSeconds = settings.requestTimeout.toLong(),
-                maxRetries = 0, // No retry for quick test
                 paramsTemplate = settings.webhookParams,
                 headers = settings.getHeadersMap()
             )
@@ -414,7 +413,6 @@ class MainActivity : AppCompatActivity() {
                 deviceName = settings.deviceName,
                 context = this@MainActivity,
                 timeoutSeconds = settings.requestTimeout.toLong(),
-                maxRetries = settings.retryTimes,
                 paramsTemplate = settings.webhookParams,
                 headers = settings.getHeadersMap()
             )

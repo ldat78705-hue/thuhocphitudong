@@ -50,8 +50,13 @@ class KeepAliveWorker(
         try {
             val settings = SettingsManager(applicationContext)
             if (settings.isForwardingEnabled) {
-                Log.d(TAG, "Forwarding enabled - ensuring ForegroundService is running")
+                Log.d(TAG, "Forwarding enabled - ensuring services are running")
                 ForegroundService.start(applicationContext)
+                
+                // Also check if notification listener is alive
+                if (!NotifyListenerService.isRunning) {
+                    Log.w(TAG, "NotifyListenerService is NOT running - ForegroundService will toggle it")
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "KeepAlive error: ${e.message}", e)

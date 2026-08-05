@@ -79,7 +79,6 @@ class SendWorker(
             deviceName = deviceName,
             context = applicationContext,
             timeoutSeconds = timeout,
-            maxRetries = maxRetries,
             paramsTemplate = paramsTemplate,
             headers = headers
         )
