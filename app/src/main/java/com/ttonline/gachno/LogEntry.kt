@@ -8,7 +8,7 @@ import java.util.Locale
  * Represents a single forwarded notification log entry.
  */
 data class LogEntry(
-    val id: Long = System.currentTimeMillis(),
+    val id: Long = generateId(),
     val appName: String,
     val packageName: String,
     val title: String,
@@ -18,6 +18,14 @@ data class LogEntry(
     val responseCode: Int = 0,
     val errorMessage: String = ""
 ) {
+    companion object {
+        private var counter = 0L
+        @Synchronized
+        private fun generateId(): Long {
+            // Combine timestamp + counter to avoid collision
+            return System.currentTimeMillis() * 100 + (counter++ % 100)
+        }
+    }
     enum class Status {
         PENDING,
         SUCCESS,

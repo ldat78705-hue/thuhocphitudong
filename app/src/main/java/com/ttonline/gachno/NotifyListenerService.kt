@@ -131,11 +131,9 @@ class NotifyListenerService : NotificationListenerService() {
         var text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
 
         // Try BIG_TEXT - crucial for bank notifications!
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
-            if (bigText.isNotEmpty()) {
-                text = bigText
-            }
+        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
+        if (bigText.isNotEmpty()) {
+            text = bigText
         }
 
         // Fallback to tickerText
