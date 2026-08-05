@@ -69,4 +69,8 @@
     <string name="monitoring_all">No filter — monitoring all apps</string>
     <string name="monitoring_count">Monitoring %d app(s)</string>
     <string name="app_icon">App icon</string>
+
+    <!-- Setup Wizard -->
+    <string name="setup_listener_message">GachNo needs Notification Access to read bank notifications.\n\nPlease find and enable \"GachNo\" in the next screen.</string>
+    <string name="setup_complete">✅ Setup complete! GachNo is ready to forward notifications.</string>
 </resources>

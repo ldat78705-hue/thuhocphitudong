@@ -73,11 +73,19 @@
             android:exported="true"
             tools:ignore="IntentFilterExportedReceiver">
             <intent-filter android:priority="2147483647">
+                <!-- Standard Android -->
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.REBOOT" />
+                <!-- Quick boot: HTC, Honor, Huawei -->
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="android.intent.action.REBOOT" />
+                <!-- Samsung -->
+                <action android:name="com.samsung.android.intent.action.BOOT_COMPLETED" />
+                <!-- Xiaomi -->
+                <action android:name="com.miui.intent.action.BOOT_COMPLETED" />
+                <!-- ASUS -->
+                <action android:name="com.asus.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 

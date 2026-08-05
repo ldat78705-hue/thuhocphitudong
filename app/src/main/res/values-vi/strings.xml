@@ -69,4 +69,8 @@
     <string name="monitoring_all">Không lọc — theo dõi tất cả ứng dụng</string>
     <string name="monitoring_count">Đang theo dõi %d ứng dụng</string>
     <string name="app_icon">Biểu tượng ứng dụng</string>
+
+    <!-- Setup Wizard -->
+    <string name="setup_listener_message">GachNo cần quyền Đọc thông báo để nhận thông báo ngân hàng.\n\nVui lòng tìm và BẬT \"GachNo\" trong màn hình tiếp theo.</string>
+    <string name="setup_complete">✅ Thiết lập hoàn tất! GachNo sẵn sàng chuyển tiếp thông báo.</string>
 </resources>

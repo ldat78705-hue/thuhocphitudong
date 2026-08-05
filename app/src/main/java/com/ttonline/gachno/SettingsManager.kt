@@ -32,6 +32,8 @@ class SettingsManager(context: Context) {
         private const val KEY_TEST_PACKAGE = "test_package"
         private const val KEY_TEST_TITLE = "test_title"
         private const val KEY_TEST_CONTENT = "test_content"
+        // Setup wizard
+        private const val KEY_SETUP_COMPLETED = "setup_completed"
         // Last notification hash for duplicate detection
         private const val KEY_LAST_NOTIFY_HASH = "last_notify_hash"
         private const val KEY_LAST_NOTIFY_TIME = "last_notify_time"
@@ -89,6 +91,11 @@ class SettingsManager(context: Context) {
     var isForwardingEnabled: Boolean
         get() = prefs.getBoolean(KEY_FORWARDING_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_FORWARDING_ENABLED, value).apply()
+
+    // --- Setup Wizard ---
+    var isSetupCompleted: Boolean
+        get() = prefs.getBoolean(KEY_SETUP_COMPLETED, false)
+        set(value) = prefs.edit().putBoolean(KEY_SETUP_COMPLETED, value).apply()
 
     // --- Language ---
     var language: String

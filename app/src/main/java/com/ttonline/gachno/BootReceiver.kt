@@ -27,7 +27,10 @@ class BootReceiver : BroadcastReceiver() {
             Intent.ACTION_LOCKED_BOOT_COMPLETED,
             "android.intent.action.QUICKBOOT_POWERON",
             "com.htc.intent.action.QUICKBOOT_POWERON",
-            "android.intent.action.REBOOT" -> {
+            "android.intent.action.REBOOT",
+            "com.samsung.android.intent.action.BOOT_COMPLETED",
+            "com.miui.intent.action.BOOT_COMPLETED",
+            "com.asus.intent.action.BOOT_COMPLETED" -> {
                 // ALWAYS start ForegroundService on boot
                 // The service itself will check if forwarding is enabled
                 Log.d(TAG, "Starting ForegroundService from boot")

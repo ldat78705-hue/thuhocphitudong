@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
@@ -15,6 +16,8 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.ttonline.gachno.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +43,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var logAdapter: LogAdapter
     private val webhookSender = WebhookSender()
 
+    // Setup wizard state
+    companion object {
+        private const val REQUEST_NOTIFICATION_PERMISSION = 1001
+        private const val SETUP_STEP_NOTIFICATION_PERM = 0
+        private const val SETUP_STEP_BATTERY = 1
+        private const val SETUP_STEP_LISTENER = 2
+        private const val SETUP_STEP_DONE = 3
+    }
+    private var setupPendingStep = SETUP_STEP_DONE // No setup by default
+
     // Receiver to update log list when a notification is forwarded
     private val logUpdateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -63,6 +76,11 @@ class MainActivity : AppCompatActivity() {
             ForegroundService.start(this)
             KeepAliveWorker.schedule(this)
         }
+
+        // Auto-setup wizard on first launch
+        if (!settings.isSetupCompleted) {
+            startAutoSetup()
+        }
     }
 
     override fun onResume() {
@@ -75,6 +93,11 @@ class MainActivity : AppCompatActivity() {
             registerReceiver(logUpdateReceiver, filter, RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(logUpdateReceiver, filter)
+        }
+
+        // Continue setup wizard after returning from settings
+        if (setupPendingStep != SETUP_STEP_DONE) {
+            continueSetup()
         }
     }
 
@@ -462,6 +485,118 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(Settings.ACTION_SETTINGS))
                 }
             }
+        }
+    }
+
+    // ==================== AUTO-SETUP WIZARD ====================
+
+    /**
+     * Start the auto-setup wizard.
+     * Steps run sequentially:
+     * 1. Request POST_NOTIFICATIONS permission (Android 13+)
+     * 2. Request battery optimization bypass
+     * 3. Open Notification Listener settings
+     * Each step auto-proceeds to the next on resume.
+     */
+    private fun startAutoSetup() {
+        setupPendingStep = SETUP_STEP_NOTIFICATION_PERM
+        runSetupStep()
+    }
+
+    private fun runSetupStep() {
+        when (setupPendingStep) {
+            SETUP_STEP_NOTIFICATION_PERM -> {
+                // Android 13+ requires POST_NOTIFICATIONS permission
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
+                        != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(
+                            this,
+                            arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                            REQUEST_NOTIFICATION_PERMISSION
+                        )
+                        return // Wait for callback
+                    }
+                }
+                // Already granted or not needed, move to next
+                setupPendingStep = SETUP_STEP_BATTERY
+                runSetupStep()
+            }
+            SETUP_STEP_BATTERY -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val pm = getSystemService(POWER_SERVICE) as PowerManager
+                    if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                        setupPendingStep = SETUP_STEP_LISTENER // Next step after return
+                        try {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                            intent.data = Uri.parse("package:$packageName")
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            try {
+                                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                            } catch (_: Exception) {}
+                        }
+                        return // Wait for return
+                    }
+                }
+                // Already done, move to next
+                setupPendingStep = SETUP_STEP_LISTENER
+                runSetupStep()
+            }
+            SETUP_STEP_LISTENER -> {
+                if (!isNotificationListenerEnabled()) {
+                    setupPendingStep = SETUP_STEP_DONE
+                    AlertDialog.Builder(this)
+                        .setTitle(getString(R.string.permission_required))
+                        .setMessage(getString(R.string.setup_listener_message))
+                        .setCancelable(false)
+                        .setPositiveButton(getString(R.string.go_to_settings)) { _, _ ->
+                            openNotificationListenerSettings()
+                        }
+                        .show()
+                    return
+                }
+                // Already enabled
+                finishSetup()
+            }
+            SETUP_STEP_DONE -> {
+                // Nothing to do
+            }
+        }
+    }
+
+    /**
+     * Continue setup after returning from system settings.
+     */
+    private fun continueSetup() {
+        when (setupPendingStep) {
+            SETUP_STEP_LISTENER -> {
+                // Returned from battery settings, now go to listener
+                runSetupStep()
+            }
+            SETUP_STEP_DONE -> {
+                // Check if listener was just enabled
+                if (isNotificationListenerEnabled()) {
+                    finishSetup()
+                }
+            }
+        }
+    }
+
+    private fun finishSetup() {
+        setupPendingStep = SETUP_STEP_DONE
+        settings.isSetupCompleted = true
+        updateServiceStatus()
+        Toast.makeText(this, getString(R.string.setup_complete), Toast.LENGTH_LONG).show()
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
+            // Move to next step regardless of result
+            setupPendingStep = SETUP_STEP_BATTERY
+            runSetupStep()
         }
     }
 
