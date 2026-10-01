@@ -119,6 +119,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
+        // --- Version display (dynamic, never hardcoded) ---
+        try {
+            val versionName = packageManager.getPackageInfo(packageName, 0).versionName
+            binding.tvVersion.text = " v$versionName"
+        } catch (_: Exception) {}
+
         // --- Web link ---
         binding.tvWebLink.setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://tt.thaydat.edu.vn")))

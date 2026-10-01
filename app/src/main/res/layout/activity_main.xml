@@ -45,9 +45,10 @@
                         android:textColor="#FFFFFF" />
 
                     <TextView
+                        android:id="@+id/tvVersion"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text=" v1.9.3"
+                        android:text=""
                         android:textSize="14sp"
                         android:textColor="#B2EBF2"
                         android:layout_marginStart="6dp" />
