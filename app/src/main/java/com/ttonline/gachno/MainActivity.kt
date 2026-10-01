@@ -81,6 +81,11 @@ class MainActivity : AppCompatActivity() {
         if (!settings.isSetupCompleted) {
             startAutoSetup()
         }
+
+        // Check for app updates from GitHub Releases (silent, non-blocking)
+        CoroutineScope(Dispatchers.Main).launch {
+            UpdateChecker(this@MainActivity).checkForUpdate(this@MainActivity)
+        }
     }
 
     override fun onResume() {
