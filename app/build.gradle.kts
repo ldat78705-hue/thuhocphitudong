@@ -20,8 +20,8 @@ android {
         applicationId = "com.ttonline.gachno"
         minSdk = 26
         targetSdk = 34
-        versionCode = 16
-        versionName = "1.9.6"
+        versionCode = 17
+        versionName = "1.9.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -64,6 +64,9 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // Lifecycle (lifecycleScope for safe coroutine management in Activity)
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
 
     // WorkManager for guaranteed webhook delivery (same as SmsForwarder)
     implementation("androidx.work:work-runtime-ktx:2.9.0")

@@ -23,6 +23,7 @@ import com.ttonline.gachno.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 import java.util.Locale
 
 /**
@@ -83,7 +84,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Check for app updates from GitHub Releases (silent, non-blocking)
-        CoroutineScope(Dispatchers.Main).launch {
+        // lifecycleScope auto-cancels when activity is destroyed → no crash
+        lifecycleScope.launch {
             UpdateChecker(this@MainActivity).checkForUpdate(this@MainActivity)
         }
     }
