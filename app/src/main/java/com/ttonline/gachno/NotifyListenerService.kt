@@ -82,7 +82,13 @@ class NotifyListenerService : NotificationListenerService() {
         wakeLock.acquire(30_000) // 30 second max
 
         try {
-            processNotification(sbn)
+            // SYNCHRONIZED: Serialize notification processing to prevent race conditions
+            // When MB Bank sends 2 GD from same person (e.g. DAO THI XOAN HS021 + HS079),
+            // Android may call onNotificationPosted near-simultaneously from different threads.
+            // Without sync, isDuplicate() could see stale data → miss transactions.
+            synchronized(this) {
+                processNotification(sbn)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error processing notification: ${e.message}", e)
         } finally {
@@ -136,6 +142,22 @@ class NotifyListenerService : NotificationListenerService() {
             text = bigText
         }
 
+        // === EXTRA_TEXT_LINES: InboxStyle support ===
+        // MB Bank may group multiple transactions into a single InboxStyle notification.
+        // When this happens, EXTRA_TEXT contains only the LAST line,
+        // but EXTRA_TEXT_LINES contains ALL individual transaction lines.
+        // Example: DAO THI XOAN pays for HS021 and HS079 → 2 lines in EXTRA_TEXT_LINES
+        // Without this, we'd only see HS079 (last line) and miss HS021.
+        val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+        if (textLines != null && textLines.size > 1) {
+            // Multiple lines detected — join them all to ensure no transaction is lost
+            val allLines = textLines.joinToString("\n") { it.toString() }
+            if (allLines.length > text.length) {
+                text = allLines
+                Log.d(TAG, ">>> InboxStyle detected: ${textLines.size} lines, using all lines")
+            }
+        }
+
         // Fallback to tickerText
         if (text.isEmpty() && notification.tickerText != null) {
             text = notification.tickerText.toString()
@@ -150,7 +172,11 @@ class NotifyListenerService : NotificationListenerService() {
         // Duplicate check - include notification key to differentiate 
         // same-content notifications (e.g. 1 parent paying for 2 students)
         if (settings.isDuplicate(packageName, title, text, sbn.key, sbn.postTime)) {
-            Log.d(TAG, "<<< SKIP: duplicate")
+            // AUDIT LOG: Full details of skipped notification for investigation
+            // (Security role: financial transactions must have audit trail even when skipped)
+            Log.w(TAG, "<<< SKIP duplicate: pkg=$packageName " +
+                    "key=${sbn.key} postTime=${sbn.postTime} " +
+                    "title='$title' content='${text.take(100)}...'")
             return
         }
 

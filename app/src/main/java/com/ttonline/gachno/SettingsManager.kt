@@ -2,8 +2,10 @@ package com.ttonline.gachno
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Manages all app settings via SharedPreferences.
@@ -15,6 +17,7 @@ import com.google.gson.reflect.TypeToken
 class SettingsManager(context: Context) {
 
     companion object {
+        private const val TAG = "GachNo_Dedup"
         private const val PREFS_NAME = "gachno_prefs"
         private const val KEY_WEBHOOK_URL = "webhook_url"
         private const val KEY_WEBHOOK_PARAMS = "webhook_params"
@@ -51,6 +54,19 @@ class SettingsManager(context: Context) {
          *   [timestamp]    - ISO 8601 timestamp
          */
         const val DEFAULT_PARAMS = """{"text": "[title] [content]"}"""
+
+        /**
+         * Thread-safe in-memory dedup cache.
+         * Key = fingerprint (packageName + content hash), Value = timestamp (ms).
+         *
+         * WHY ConcurrentHashMap instead of SharedPreferences:
+         * - SharedPreferences apply() is ASYNC → 2 threads can read stale data and overwrite
+         *   each other → entries lost → transactions lost (DAO THI XOAN HS021 case)
+         * - ConcurrentHashMap is lock-free for reads, segment-locked for writes → no race condition
+         * - Lives in companion object → shared across all SettingsManager instances in same process
+         * - NotificationListenerService runs in main process → same JVM → same map
+         */
+        private val dedupCache = ConcurrentHashMap<String, Long>(32)
     }
 
     private val prefs: SharedPreferences = run {
@@ -167,55 +183,81 @@ class SettingsManager(context: Context) {
 
     // --- Duplicate Detection ---
     /**
-     * Detects true duplicate notifications.
-     * 
-     * Uses a combination of notifKey + postTime + content hash as fingerprint.
-     * Keeps last 20 fingerprints. Only skips if EXACT SAME fingerprint seen
-     * within the interval window.
-     * 
-     * This correctly handles:
-     * - 1 PH paying for 2 HS (different content → different fingerprint → both forwarded)
-     * - Android re-posting same notification (same key+postTime+content → same fingerprint → skipped)
-     * - Same PH paying same amount for 2 HS (same content BUT different key/postTime → both forwarded)
+     * Detects true duplicate notifications using ConcurrentHashMap (thread-safe).
+     *
+     * FINGERPRINT DESIGN (reviewed by 5 roles):
+     *   fingerprint = packageName + "|" + content.hashCode()
+     *
+     * WHY content-only (no notifKey, no postTime):
+     * - 2 different transactions ALWAYS have different content
+     *   (different amount, HS code, balance, timestamp in text)
+     *   → different fingerprint → BOTH forwarded ✓
+     * - Android re-posting same notification = same content
+     *   → same fingerprint → correctly skipped ✓
+     * - MB Bank replacing notification (same ID, new content)
+     *   → different content → different fingerprint → BOTH forwarded ✓
+     * - Same PH, same amount, different HS → content differs (HS code, Ma GD)
+     *   → different fingerprint → BOTH forwarded ✓
+     *
+     * THREAD SAFETY:
+     * - ConcurrentHashMap.putIfAbsent() is ATOMIC
+     * - No read-then-write gap (unlike SharedPreferences approach)
+     * - 2 threads with same fingerprint: only 1st wins → no race condition
+     * - 2 threads with different fingerprints: both succeed → no data loss
+     *
+     * CASE DAO THI XOAN:
+     * - HS021 (250K) content: "TK 88xxx688|GD: +250,000...HOC PHI HS021..."
+     * - HS079 (400K) content: "TK 88xxx688|GD: +400,000...HOC PHI HS079..."
+     * - Different content → different hashCode → different fingerprint
+     * - Both forwarded even if arriving in same millisecond ✓
      */
-    fun isDuplicate(packageName: String, title: String, content: String, 
+    fun isDuplicate(packageName: String, title: String, content: String,
                     notifKey: String, postTime: Long): Boolean {
         val interval = duplicateInterval
         if (interval <= 0) return false
 
         val now = System.currentTimeMillis()
-        // Fingerprint = key + postTime + content hash (all 3 must match to be duplicate)
-        val fingerprint = "$notifKey|$postTime|${content.hashCode()}"
+        val intervalMs = interval * 1000L
 
-        // Load recent fingerprints
-        val recentJson = prefs.getString("recent_notif_fps", "") ?: ""
-        val recentList = if (recentJson.isNotEmpty()) {
-            recentJson.split(";;;").mapNotNull { entry ->
-                val parts = entry.split("@@@")
-                if (parts.size == 2) Pair(parts[0], parts[1].toLongOrNull() ?: 0L) else null
-            }.toMutableList()
-        } else {
-            mutableListOf()
+        // === Cleanup expired entries (non-blocking) ===
+        // ConcurrentHashMap iteration is weakly consistent — safe during concurrent modification
+        val expiredKeys = dedupCache.entries
+            .filter { (now - it.value) > intervalMs }
+            .map { it.key }
+        expiredKeys.forEach { dedupCache.remove(it) }
+
+        // === Build fingerprint from content only ===
+        // Content includes: amount, account, balance, HS code, Ma GD, timestamp
+        // ALL of these differ between transactions → unique fingerprint per transaction
+        val fingerprint = "$packageName|${content.hashCode()}"
+
+        // === Atomic duplicate check ===
+        // putIfAbsent returns null if key was NOT present (= new transaction)
+        // putIfAbsent returns existing value if key WAS present (= duplicate)
+        val existingTimestamp = dedupCache.putIfAbsent(fingerprint, now)
+
+        if (existingTimestamp != null) {
+            // Key existed — but is it still within the interval window?
+            val age = now - existingTimestamp
+            if (age <= intervalMs) {
+                // TRUE DUPLICATE: same content within interval → skip
+                Log.w(TAG, "<<< DUPLICATE DETECTED: pkg=$packageName " +
+                        "content='${content.take(80)}...' " +
+                        "fingerprint=$fingerprint " +
+                        "age=${age}ms interval=${intervalMs}ms")
+                return true
+            } else {
+                // Entry expired — treat as new, update timestamp
+                dedupCache[fingerprint] = now
+                Log.d(TAG, ">>> Expired entry refreshed: $fingerprint")
+                return false
+            }
         }
 
-        // Clean expired entries
-        recentList.removeAll { (now - it.second) > interval * 1000L }
-
-        // Check if this fingerprint was seen recently
-        val isDup = recentList.any { it.first == fingerprint }
-        
-        if (!isDup) {
-            // Add new fingerprint
-            recentList.add(Pair(fingerprint, now))
-            // Keep only last 20
-            while (recentList.size > 20) recentList.removeAt(0)
-        }
-
-        // Save back
-        val newJson = recentList.joinToString(";;;") { "${it.first}@@@${it.second}" }
-        prefs.edit().putString("recent_notif_fps", newJson).apply()
-
-        return isDup
+        // New fingerprint — not a duplicate
+        Log.d(TAG, ">>> New transaction: pkg=$packageName " +
+                "content='${content.take(60)}...' fingerprint=$fingerprint")
+        return false
     }
 
     /**
