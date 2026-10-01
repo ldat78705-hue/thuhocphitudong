@@ -185,31 +185,24 @@ class SettingsManager(context: Context) {
     /**
      * Detects true duplicate notifications using ConcurrentHashMap (thread-safe).
      *
-     * FINGERPRINT DESIGN (reviewed by 5 roles):
-     *   fingerprint = packageName + "|" + content.hashCode()
+     * FINGERPRINT DESIGN (reviewed by 5 roles, v1.9.5):
+     *   fingerprint = packageName + "|" + title + "|" + content
      *
-     * WHY content-only (no notifKey, no postTime):
-     * - 2 different transactions ALWAYS have different content
-     *   (different amount, HS code, balance, timestamp in text)
-     *   → different fingerprint → BOTH forwarded ✓
-     * - Android re-posting same notification = same content
-     *   → same fingerprint → correctly skipped ✓
-     * - MB Bank replacing notification (same ID, new content)
-     *   → different content → different fingerprint → BOTH forwarded ✓
-     * - Same PH, same amount, different HS → content differs (HS code, Ma GD)
-     *   → different fingerprint → BOTH forwarded ✓
+     * WHY full string (not hashCode):
+     * - hashCode() is 32-bit → collision risk (2 different GD could match)
+     * - Full string comparison = ZERO collision risk
+     * - ConcurrentHashMap supports String keys of any length
+     * - Memory impact negligible: entries expire after 5s, max ~10 entries
+     *
+     * WHY include title:
+     * - Some banks put amount in title (e.g. "Nhận +500,000đ")
+     * - Without title, 2 GD with same content but different title → falsely skipped
      *
      * THREAD SAFETY:
      * - ConcurrentHashMap.putIfAbsent() is ATOMIC
      * - No read-then-write gap (unlike SharedPreferences approach)
      * - 2 threads with same fingerprint: only 1st wins → no race condition
      * - 2 threads with different fingerprints: both succeed → no data loss
-     *
-     * CASE DAO THI XOAN:
-     * - HS021 (250K) content: "TK 88xxx688|GD: +250,000...HOC PHI HS021..."
-     * - HS079 (400K) content: "TK 88xxx688|GD: +400,000...HOC PHI HS079..."
-     * - Different content → different hashCode → different fingerprint
-     * - Both forwarded even if arriving in same millisecond ✓
      */
     fun isDuplicate(packageName: String, title: String, content: String,
                     notifKey: String, postTime: Long): Boolean {
@@ -220,43 +213,34 @@ class SettingsManager(context: Context) {
         val intervalMs = interval * 1000L
 
         // === Cleanup expired entries (non-blocking) ===
-        // ConcurrentHashMap iteration is weakly consistent — safe during concurrent modification
         val expiredKeys = dedupCache.entries
             .filter { (now - it.value) > intervalMs }
             .map { it.key }
         expiredKeys.forEach { dedupCache.remove(it) }
 
-        // === Build fingerprint from content only ===
-        // Content includes: amount, account, balance, HS code, Ma GD, timestamp
-        // ALL of these differ between transactions → unique fingerprint per transaction
-        val fingerprint = "$packageName|${content.hashCode()}"
+        // === Build fingerprint from FULL content (no hash) ===
+        // Include title + content for zero-collision dedup
+        val fingerprint = "$packageName|$title|$content"
 
         // === Atomic duplicate check ===
-        // putIfAbsent returns null if key was NOT present (= new transaction)
-        // putIfAbsent returns existing value if key WAS present (= duplicate)
         val existingTimestamp = dedupCache.putIfAbsent(fingerprint, now)
 
         if (existingTimestamp != null) {
-            // Key existed — but is it still within the interval window?
             val age = now - existingTimestamp
             if (age <= intervalMs) {
-                // TRUE DUPLICATE: same content within interval → skip
                 Log.w(TAG, "<<< DUPLICATE DETECTED: pkg=$packageName " +
-                        "content='${content.take(80)}...' " +
-                        "fingerprint=$fingerprint " +
+                        "title='${title.take(30)}' content='${content.take(60)}...' " +
                         "age=${age}ms interval=${intervalMs}ms")
                 return true
             } else {
-                // Entry expired — treat as new, update timestamp
                 dedupCache[fingerprint] = now
-                Log.d(TAG, ">>> Expired entry refreshed: $fingerprint")
+                Log.d(TAG, ">>> Expired entry refreshed")
                 return false
             }
         }
 
-        // New fingerprint — not a duplicate
         Log.d(TAG, ">>> New transaction: pkg=$packageName " +
-                "content='${content.take(60)}...' fingerprint=$fingerprint")
+                "title='${title.take(30)}' content='${content.take(60)}...'")
         return false
     }
 

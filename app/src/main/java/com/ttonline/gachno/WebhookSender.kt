@@ -31,6 +31,7 @@ class WebhookSender {
         // Creating a new client per request leaks connections and thread pools
         @Volatile
         private var sharedClient: OkHttpClient? = null
+        @Volatile
         private var clientTimeout: Long = 0L
 
         private fun getClient(timeoutSeconds: Long): OkHttpClient {
@@ -83,15 +84,31 @@ class WebhookSender {
     }
 
     /**
-     * Escape special characters for JSON string values.
+     * Escape special characters for JSON string values (RFC 8259 compliant).
+     * Handles all control characters that could cause server JSON parse errors.
      */
     private fun escapeJson(value: String): String {
-        return value
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
+        val sb = StringBuilder(value.length + 16)
+        for (ch in value) {
+            when (ch) {
+                '\\' -> sb.append("\\\\")
+                '"' -> sb.append("\\\"")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\t' -> sb.append("\\t")
+                '\b' -> sb.append("\\b")
+                '\u000C' -> sb.append("\\f")  // form feed
+                else -> {
+                    if (ch.code < 0x20) {
+                        // Other control characters → Unicode escape
+                        sb.append("\\u%04x".format(ch.code))
+                    } else {
+                        sb.append(ch)
+                    }
+                }
+            }
+        }
+        return sb.toString()
     }
 
     /**

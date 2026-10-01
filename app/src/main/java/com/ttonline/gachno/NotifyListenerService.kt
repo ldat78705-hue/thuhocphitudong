@@ -144,17 +144,21 @@ class NotifyListenerService : NotificationListenerService() {
 
         // === EXTRA_TEXT_LINES: InboxStyle support ===
         // MB Bank may group multiple transactions into a single InboxStyle notification.
-        // When this happens, EXTRA_TEXT contains only the LAST line,
-        // but EXTRA_TEXT_LINES contains ALL individual transaction lines.
-        // Example: DAO THI XOAN pays for HS021 and HS079 → 2 lines in EXTRA_TEXT_LINES
-        // Without this, we'd only see HS079 (last line) and miss HS021.
+        // IMPORTANT: When InboxStyle updates, it contains ALL previous lines + new line.
+        // We must ONLY take the LAST line (newest transaction), because:
+        // - Previous lines were already forwarded as standalone notifications
+        // - Joining all lines would cause GD 1 to be sent TWICE → server gạch nợ 2 lần!
+        // Example: DAO THI XOAN pays for HS021 then HS079:
+        //   1st notif: EXTRA_TEXT = "...HS021..." → forwarded ✅
+        //   2nd notif: EXTRA_TEXT_LINES = ["...HS021...", "...HS079..."]
+        //   We take ONLY "...HS079..." (last line) → forwarded ✅, HS021 NOT duplicated ✅
         val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
         if (textLines != null && textLines.size > 1) {
-            // Multiple lines detected — join them all to ensure no transaction is lost
-            val allLines = textLines.joinToString("\n") { it.toString() }
-            if (allLines.length > text.length) {
-                text = allLines
-                Log.d(TAG, ">>> InboxStyle detected: ${textLines.size} lines, using all lines")
+            // Take ONLY the last line (newest transaction)
+            val lastLine = textLines.last().toString()
+            if (lastLine.isNotEmpty()) {
+                text = lastLine
+                Log.d(TAG, ">>> InboxStyle detected: ${textLines.size} lines, using LAST line only")
             }
         }
 
