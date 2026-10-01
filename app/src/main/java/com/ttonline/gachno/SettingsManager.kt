@@ -213,6 +213,8 @@ class SettingsManager(context: Context) {
         val intervalMs = interval * 1000L
 
         // === Cleanup expired entries (non-blocking) ===
+        // Size guard: prevent unbounded growth in burst scenarios
+        if (dedupCache.size > 100) dedupCache.clear()
         val expiredKeys = dedupCache.entries
             .filter { (now - it.value) > intervalMs }
             .map { it.key }

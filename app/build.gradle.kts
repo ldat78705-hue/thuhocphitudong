@@ -10,9 +10,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("debug.keystore")
-            storePassword = "gachno123"
-            keyAlias = "gachno"
-            keyPassword = "gachno123"
+            storePassword = System.getenv("KEYSTORE_PASS") ?: "gachno123"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "gachno"
+            keyPassword = System.getenv("KEY_PASS") ?: "gachno123"
         }
     }
 
@@ -20,8 +20,8 @@ android {
         applicationId = "com.ttonline.gachno"
         minSdk = 26
         targetSdk = 34
-        versionCode = 19
-        versionName = "1.9.9"
+        versionCode = 20
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

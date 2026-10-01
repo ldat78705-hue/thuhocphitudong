@@ -74,25 +74,23 @@ class NotifyListenerService : NotificationListenerService() {
     @SuppressLint("DiscouragedPrivateApi")
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         // Acquire WakeLock to prevent CPU sleep during processing
-        val pm = getSystemService(POWER_SERVICE) as PowerManager
-        val wakeLock = pm.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "GachNo:NotificationProcessing"
-        )
-        wakeLock.acquire(30_000) // 30 second max
-
+        var wakeLock: PowerManager.WakeLock? = null
         try {
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "GachNo:NotificationProcessing"
+            )
+            wakeLock.acquire(30_000) // 30 second max
+
             // SYNCHRONIZED: Serialize notification processing to prevent race conditions
-            // When MB Bank sends 2 GD from same person (e.g. DAO THI XOAN HS021 + HS079),
-            // Android may call onNotificationPosted near-simultaneously from different threads.
-            // Without sync, isDuplicate() could see stale data → miss transactions.
             synchronized(this) {
                 processNotification(sbn)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error processing notification: ${e.message}", e)
         } finally {
-            try { wakeLock.release() } catch (_: Exception) {}
+            try { if (wakeLock?.isHeld == true) wakeLock.release() } catch (_: Exception) {}
         }
     }
 
@@ -203,8 +201,8 @@ class NotifyListenerService : NotificationListenerService() {
         )
         settings.addLog(logEntry)
 
-        // Serialize headers for WorkManager
-        val headersString = settings.getHeadersMap().entries.joinToString("|||") { "${it.key}:::${it.value}" }
+        // Serialize headers for WorkManager (use Gson for safe serialization)
+        val headersString = com.google.gson.Gson().toJson(settings.getHeadersMap())
 
         // === Use WorkManager for GUARANTEED delivery ===
         // WorkManager survives process death - Android will execute even if app is killed

@@ -50,18 +50,11 @@ class SendWorker(
 
         val settings = SettingsManager(applicationContext)
 
-        // Parse headers from JSON
+        // Parse headers from Gson JSON (matches serialization in NotifyListenerService)
         val headers = try {
             if (headersJson.isNotEmpty()) {
-                val map = mutableMapOf<String, String>()
-                val pairs = headersJson.split("|||")
-                for (pair in pairs) {
-                    val kv = pair.split(":::")
-                    if (kv.size == 2) {
-                        map[kv[0]] = kv[1]
-                    }
-                }
-                map
+                val type = object : com.google.gson.reflect.TypeToken<Map<String, String>>() {}.type
+                com.google.gson.Gson().fromJson<Map<String, String>>(headersJson, type)
             } else {
                 settings.getHeadersMap()
             }
