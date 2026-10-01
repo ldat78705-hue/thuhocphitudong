@@ -325,7 +325,7 @@ class MainActivity : AppCompatActivity() {
         // Save params/headers before testing
         saveWebhookFields()
 
-        CoroutineScope(Dispatchers.Main).launch {
+        lifecycleScope.launch {
             val result = webhookSender.send(
                 webhookUrl = url,
                 appName = "GachNo Test",
@@ -416,7 +416,7 @@ class MainActivity : AppCompatActivity() {
         )
         settings.addLog(logEntry)
 
-        CoroutineScope(Dispatchers.Main).launch {
+        lifecycleScope.launch {
             val result = webhookSender.send(
                 webhookUrl = url,
                 appName = testAppName,
@@ -632,7 +632,7 @@ class MainActivity : AppCompatActivity() {
     private fun isNotificationListenerEnabled(): Boolean {
         val cn = ComponentName(this, NotifyListenerService::class.java)
         val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
-        return flat != null && flat.contains(cn.flattenToString())
+        return flat != null && (flat.contains(cn.flattenToString()) || flat.contains(cn.flattenToShortString()))
     }
 
     private fun showEnableNotificationListenerDialog() {
@@ -668,10 +668,13 @@ class MainActivity : AppCompatActivity() {
      */
     private fun openAutoStartSettings() {
         val intents = listOf(
-            // Honor / Huawei
+            // Huawei
             Intent().setClassName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
             Intent().setClassName("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"),
             Intent().setClassName("com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity"),
+            // Honor MagicOS (new Honor phones split from Huawei)
+            Intent().setClassName("com.hihonor.systemmanager", "com.hihonor.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
+            Intent().setClassName("com.hihonor.systemmanager", "com.hihonor.systemmanager.optimize.process.ProtectActivity"),
             // Xiaomi
             Intent().setClassName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
             // Oppo

@@ -95,16 +95,13 @@ class UpdateChecker(private val context: Context) {
             .build()
 
         try {
-            val response = client.newCall(request).execute()
-            if (response.isSuccessful) {
-                val body = response.body?.string()
-                response.close()
-                if (body != null) {
-                    Gson().fromJson(body, GitHubRelease::class.java)
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string()
+                    if (body != null) {
+                        Gson().fromJson(body, GitHubRelease::class.java)
+                    } else null
                 } else null
-            } else {
-                response.close()
-                null
             }
         } catch (e: Exception) {
             Log.w(TAG, "Network error: ${e.message}")

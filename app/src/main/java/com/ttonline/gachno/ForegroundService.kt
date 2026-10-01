@@ -78,17 +78,17 @@ class ForegroundService : Service() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "startForeground failed: ${e.message}")
-            // Fallback: just show notification
-            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            nm.notify(NOTIFY_ID, notification)
+            // CRITICAL: Must stopSelf() or Android will kill app with ANR after 5s
+            stopSelf()
+            return START_NOT_STICKY
         }
 
         Log.d(TAG, "ForegroundService started")
 
-        // Toggle listener ONCE after 3 second delay
+        // Toggle listener ONCE after 3 second delay ONLY if not already running
         // This forces Android to rebind NotificationListenerService
-        // Same approach as SmsForwarder's CommonUtils.toggleNotificationListenerService()
-        if (!hasToggled) {
+        // Skip if already connected to avoid 500ms gap that loses notifications
+        if (!NotifyListenerService.isRunning && !hasToggled) {
             hasToggled = true
             Handler(Looper.getMainLooper()).postDelayed({
                 toggleNotificationListenerService()
@@ -136,7 +136,7 @@ class ForegroundService : Service() {
             
             Log.d(TAG, "enabled_notification_listeners: $flat")
             
-            if (flat != null && flat.contains(cn.flattenToString())) {
+            if (flat != null && (flat.contains(cn.flattenToString()) || flat.contains(cn.flattenToShortString()))) {
                 val pm = packageManager
                 
                 // Step 1: Disable

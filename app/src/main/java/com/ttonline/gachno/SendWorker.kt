@@ -90,6 +90,7 @@ class SendWorker(
             // Notify MainActivity
             try {
                 val updateIntent = Intent("com.ttonline.gachno.LOG_UPDATED")
+                updateIntent.setPackage(applicationContext.packageName)
                 applicationContext.sendBroadcast(updateIntent)
             } catch (_: Exception) {}
 

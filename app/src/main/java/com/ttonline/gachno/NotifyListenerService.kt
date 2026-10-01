@@ -153,9 +153,9 @@ class NotifyListenerService : NotificationListenerService() {
         //   2nd notif: EXTRA_TEXT_LINES = ["...HS021...", "...HS079..."]
         //   We take ONLY "...HS079..." (last line) → forwarded ✅, HS021 NOT duplicated ✅
         val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-        if (textLines != null && textLines.size > 1) {
+        if (!textLines.isNullOrEmpty()) {
             // Take ONLY the last line (newest transaction)
-            val lastLine = textLines.last().toString()
+            val lastLine = textLines.lastOrNull()?.toString() ?: ""
             if (lastLine.isNotEmpty()) {
                 text = lastLine
                 Log.d(TAG, ">>> InboxStyle detected: ${textLines.size} lines, using LAST line only")
@@ -208,7 +208,13 @@ class NotifyListenerService : NotificationListenerService() {
 
         // === Use WorkManager for GUARANTEED delivery ===
         // WorkManager survives process death - Android will execute even if app is killed
+        // Network constraint: wait for internet before sending (prevents permanent failure on temp network loss)
+        val constraints = androidx.work.Constraints.Builder()
+            .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+            .build()
+
         val workRequest = OneTimeWorkRequestBuilder<SendWorker>()
+            .setConstraints(constraints)
             .setInputData(
                 workDataOf(
                     SendWorker.KEY_WEBHOOK_URL to webhookUrl,
@@ -237,6 +243,7 @@ class NotifyListenerService : NotificationListenerService() {
         // Notify UI
         try {
             val updateIntent = Intent("com.ttonline.gachno.LOG_UPDATED")
+            updateIntent.setPackage(packageName)
             sendBroadcast(updateIntent)
         } catch (_: Exception) {}
     }

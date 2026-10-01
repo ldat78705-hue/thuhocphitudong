@@ -260,6 +260,9 @@ class SettingsManager(context: Context) {
     }
 
     // --- Logs ---
+    // logLock prevents race condition between addLog (listener thread) and updateLog (worker thread)
+    private val logLock = Any()
+
     fun getLogs(): MutableList<LogEntry> {
         val json = prefs.getString(KEY_LOGS, "[]") ?: "[]"
         val type = object : TypeToken<MutableList<LogEntry>>() {}.type
@@ -270,7 +273,7 @@ class SettingsManager(context: Context) {
         }
     }
 
-    fun addLog(entry: LogEntry) {
+    fun addLog(entry: LogEntry) = synchronized(logLock) {
         val logs = getLogs()
         logs.add(0, entry)
         while (logs.size > MAX_LOGS) {
@@ -279,7 +282,7 @@ class SettingsManager(context: Context) {
         prefs.edit().putString(KEY_LOGS, gson.toJson(logs)).apply()
     }
 
-    fun updateLog(id: Long, status: LogEntry.Status, responseCode: Int = 0, errorMessage: String = "") {
+    fun updateLog(id: Long, status: LogEntry.Status, responseCode: Int = 0, errorMessage: String = "") = synchronized(logLock) {
         val logs = getLogs()
         val index = logs.indexOfFirst { it.id == id }
         if (index >= 0) {
@@ -292,7 +295,7 @@ class SettingsManager(context: Context) {
         }
     }
 
-    fun clearLogs() {
+    fun clearLogs() = synchronized(logLock) {
         prefs.edit().putString(KEY_LOGS, "[]").apply()
     }
 }
