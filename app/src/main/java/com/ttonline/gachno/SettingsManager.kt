@@ -209,32 +209,57 @@ class SettingsManager(context: Context) {
         val now = System.currentTimeMillis()
         val intervalMs = interval * 1000L
 
-        // === Cleanup expired entries (non-blocking) ===
-        if (dedupCache.size > 100) dedupCache.clear()
+        // === Cleanup expired entries first, then check size ===
+        // TX entries (prefix "TX:") use 24h TTL, other entries use intervalMs
+        val txTtlMs = 24 * 60 * 60 * 1000L
         val expiredKeys = dedupCache.entries
-            .filter { (now - it.value) > intervalMs }
+            .filter { entry ->
+                val ttl = if (entry.key.startsWith("TX:")) txTtlMs else intervalMs
+                (now - entry.value) > ttl
+            }
             .map { it.key }
         expiredKeys.forEach { dedupCache.remove(it) }
+        // Size guard AFTER cleanup — only triggers if truly overloaded
+        if (dedupCache.size > 1000) dedupCache.clear()
 
         // === Priority 1: TransactionId-based dedup (precise) ===
         // When FT code is available, use it as THE key.
         // Same FT code = same transaction, regardless of text truncation.
+        // Use PREFIX matching: FT2627902 (truncated) matches FT26279025922201 (full)
+        // Use 24h TTL: FT codes are globally unique, bank may resend hours later
         if (!transactionId.isNullOrEmpty()) {
-            val txKey = "TX:$packageName|$transactionId"
-            val existingTimestamp = dedupCache.putIfAbsent(txKey, now)
+            val txPrefix = "TX:$packageName|"
+            val txKey = "$txPrefix$transactionId"
+            val txIntervalMs = 24 * 60 * 60 * 1000L // 24 hours for transaction IDs
 
-            if (existingTimestamp != null) {
-                val age = now - existingTimestamp
-                if (age <= intervalMs) {
-                    Log.w(TAG, "<<< DUPLICATE by TransactionId: $transactionId " +
-                            "age=${age}ms interval=${intervalMs}ms")
+            // Prefix match: find any existing key where one FT starts with the other
+            val existingEntry = dedupCache.entries.firstOrNull { entry ->
+                if (!entry.key.startsWith(txPrefix)) return@firstOrNull false
+                val existingTxId = entry.key.substringAfter(txPrefix)
+                existingTxId.startsWith(transactionId) || transactionId.startsWith(existingTxId)
+            }
+
+            if (existingEntry != null) {
+                val age = now - existingEntry.value
+                if (age <= txIntervalMs) {
+                    Log.w(TAG, "<<< DUPLICATE by TransactionId prefix: " +
+                            "new=$transactionId existing=${existingEntry.key.substringAfter(txPrefix)} " +
+                            "age=${age}ms")
+                    // Keep the LONGER (more complete) key
+                    if (txKey.length > existingEntry.key.length) {
+                        dedupCache.remove(existingEntry.key)
+                        dedupCache[txKey] = existingEntry.value
+                    }
                     return true
                 } else {
+                    dedupCache.remove(existingEntry.key)
                     dedupCache[txKey] = now
                     return false
                 }
             }
 
+            // No prefix match found — new transaction
+            dedupCache[txKey] = now
             Log.d(TAG, ">>> New transaction by ID: $transactionId")
             return false
         }

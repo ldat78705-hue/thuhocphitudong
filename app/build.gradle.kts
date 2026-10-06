@@ -20,8 +20,8 @@ android {
         applicationId = "com.ttonline.gachno"
         minSdk = 26
         targetSdk = 34
-        versionCode = 23
-        versionName = "2.0.3"
+        versionCode = 24
+        versionName = "2.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

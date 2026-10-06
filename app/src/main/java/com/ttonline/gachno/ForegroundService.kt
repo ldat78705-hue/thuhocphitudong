@@ -85,11 +85,12 @@ class ForegroundService : Service() {
 
         Log.d(TAG, "ForegroundService started")
 
-        // Toggle listener ONCE after 3 second delay ONLY if not already running
+        // Toggle listener after 3 second delay ONLY if not already running
         // This forces Android to rebind NotificationListenerService
         // Skip if already connected to avoid 500ms gap that loses notifications
-        if (!NotifyListenerService.isRunning && !hasToggled) {
-            hasToggled = true
+        // NOTE: Do NOT check hasToggled — KeepAliveWorker may restart this service
+        // when listener dies, and we MUST toggle again to recover it
+        if (!NotifyListenerService.isRunning) {
             Handler(Looper.getMainLooper()).postDelayed({
                 toggleNotificationListenerService()
             }, 3000)

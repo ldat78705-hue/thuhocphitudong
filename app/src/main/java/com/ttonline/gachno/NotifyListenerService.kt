@@ -151,7 +151,7 @@ class NotifyListenerService : NotificationListenerService() {
         //   We process EACH line: HS093 → new → forward ✅, HS006 → new → forward ✅
         //   If GD1 was already sent as standalone: HS093 → isDuplicate → skip ✅
         val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-        if (textLines != null && textLines.size > 1) {
+        if (textLines != null && textLines.isNotEmpty()) {
             Log.d(TAG, ">>> InboxStyle detected: ${textLines.size} lines, processing ALL lines individually")
             for (i in textLines.indices) {
                 val line = textLines[i]?.toString() ?: continue
@@ -277,8 +277,11 @@ class NotifyListenerService : NotificationListenerService() {
      * - Generic: any FT/CT followed by digits
      */
     private fun extractTransactionId(text: String): String? {
-        // Pattern 1: FT + 14-17 digits (MB Bank, Techcombank)
-        val ftMatch = Regex("FT\\d{14,17}").find(text)
+        // Pattern 1: FT + digits (MB Bank, Techcombank)
+        // Use FT\d{5,} not FT\d{14,17} — InboxStyle truncates text, so FT code
+        // may be cut to FT26279 (only 5 digits). We need to match truncated codes too.
+        // Minimum 5 digits to avoid false matches on short strings.
+        val ftMatch = Regex("FT\\d{5,}").find(text)
         if (ftMatch != null) return ftMatch.value
 
         // Pattern 2: "Ma GD" or "MGD" followed by alphanumeric code
