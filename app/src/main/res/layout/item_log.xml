@@ -68,15 +68,14 @@
                 android:maxLines="1"
                 android:layout_marginTop="2dp" />
 
-            <!-- Content -->
+            <!-- Content - show FULL text for manual reconciliation -->
             <TextView
                 android:id="@+id/tvLogContent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
                 android:textColor="@color/text_secondary"
-                android:ellipsize="end"
-                android:maxLines="2"
+                android:textIsSelectable="true"
                 android:layout_marginTop="2dp" />
         </LinearLayout>
     </LinearLayout>
