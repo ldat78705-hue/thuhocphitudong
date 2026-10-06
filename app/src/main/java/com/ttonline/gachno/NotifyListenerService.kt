@@ -287,13 +287,14 @@ class NotifyListenerService : NotificationListenerService() {
         val ftMatch = REGEX_FT.find(text)
         if (ftMatch != null) return ftMatch.value
 
-        // Pattern 2: "Ma GD" or "MGD" followed by alphanumeric code
-        val mgdMatch = REGEX_MGD.find(text)
-        if (mgdMatch != null) return mgdMatch.groupValues[1]
-
-        // Pattern 3: "ACSP/" followed by code (MB Bank alternate format)
+        // Pattern 2: "ACSP/" followed by code (MB Bank format: "Ma GD ACSP/ V1083643")
+        // MUST check BEFORE "Ma GD" pattern — otherwise "Ma GD" captures "ACSP" as the code
         val acspMatch = REGEX_ACSP.find(text)
         if (acspMatch != null) return "ACSP_${acspMatch.groupValues[1]}"
+
+        // Pattern 3: "Ma GD" or "MGD" followed by alphanumeric code (non-ACSP)
+        val mgdMatch = REGEX_MGD.find(text)
+        if (mgdMatch != null) return mgdMatch.groupValues[1]
 
         return null
     }
