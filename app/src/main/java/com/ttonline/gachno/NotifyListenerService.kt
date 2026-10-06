@@ -141,23 +141,25 @@ class NotifyListenerService : NotificationListenerService() {
         }
 
         // === EXTRA_TEXT_LINES: InboxStyle support ===
-        // MB Bank may group multiple transactions into a single InboxStyle notification.
-        // IMPORTANT: When InboxStyle updates, it contains ALL previous lines + new line.
-        // We must ONLY take the LAST line (newest transaction), because:
-        // - Previous lines were already forwarded as standalone notifications
-        // - Joining all lines would cause GD 1 to be sent TWICE → server gạch nợ 2 lần!
-        // Example: DAO THI XOAN pays for HS021 then HS079:
-        //   1st notif: EXTRA_TEXT = "...HS021..." → forwarded ✅
-        //   2nd notif: EXTRA_TEXT_LINES = ["...HS021...", "...HS079..."]
-        //   We take ONLY "...HS079..." (last line) → forwarded ✅, HS021 NOT duplicated ✅
+        // MB Bank groups multiple transactions into a single InboxStyle notification.
+        // When 2 GDs arrive at the SAME second (e.g. NGUYEN THI YEN pays HS093 + HS006 at 20:07),
+        // Android may send ONLY ONE InboxStyle notification containing BOTH lines.
+        // We must process ALL lines individually and use isDuplicate to skip already-forwarded ones.
+        //
+        // Flow: GD1(HS093) + GD2(HS006) arrive at 20:07 →
+        //   Android sends 1 InboxStyle with textLines = ["...HS093...", "...HS006..."]
+        //   We process EACH line: HS093 → new → forward ✅, HS006 → new → forward ✅
+        //   If GD1 was already sent as standalone: HS093 → isDuplicate → skip ✅
         val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-        if (!textLines.isNullOrEmpty()) {
-            // Take ONLY the last line (newest transaction)
-            val lastLine = textLines.lastOrNull()?.toString() ?: ""
-            if (lastLine.isNotEmpty()) {
-                text = lastLine
-                Log.d(TAG, ">>> InboxStyle detected: ${textLines.size} lines, using LAST line only")
+        if (textLines != null && textLines.size > 1) {
+            Log.d(TAG, ">>> InboxStyle detected: ${textLines.size} lines, processing ALL lines individually")
+            for (i in textLines.indices) {
+                val line = textLines[i]?.toString() ?: continue
+                if (line.isEmpty()) continue
+                // Forward each line as a separate transaction
+                forwardTransaction(sbn, packageName, title, line, webhookUrl)
             }
+            return // All lines processed individually, skip normal flow
         }
 
         // Fallback to tickerText
@@ -171,14 +173,26 @@ class NotifyListenerService : NotificationListenerService() {
             return
         }
 
-        // Duplicate check - include notification key to differentiate 
-        // same-content notifications (e.g. 1 parent paying for 2 students)
-        if (settings.isDuplicate(packageName, title, text, sbn.key, sbn.postTime)) {
-            // AUDIT LOG: Full details of skipped notification for investigation
-            // (Security role: financial transactions must have audit trail even when skipped)
+        // Forward single transaction (normal flow)
+        forwardTransaction(sbn, packageName, title, text, webhookUrl)
+    }
+
+    /**
+     * Forward a single transaction to webhook.
+     * Used by both normal notifications AND each InboxStyle line.
+     * isDuplicate() prevents sending the same content twice.
+     */
+    private fun forwardTransaction(
+        sbn: StatusBarNotification,
+        packageName: String,
+        title: String,
+        content: String,
+        webhookUrl: String
+    ) {
+        // Duplicate check
+        if (settings.isDuplicate(packageName, title, content, sbn.key, sbn.postTime)) {
             Log.w(TAG, "<<< SKIP duplicate: pkg=$packageName " +
-                    "key=${sbn.key} postTime=${sbn.postTime} " +
-                    "title='$title' content='${text.take(100)}...'")
+                    "title='$title' content='${content.take(100)}...'")
             return
         }
 
@@ -190,14 +204,14 @@ class NotifyListenerService : NotificationListenerService() {
             packageName
         }
 
-        Log.d(TAG, ">>> FORWARDING: $appName [$packageName]: $title - ${text.take(100)}")
+        Log.d(TAG, ">>> FORWARDING: $appName [$packageName]: $title - ${content.take(100)}")
 
         // Save log
         val logEntry = LogEntry(
             appName = appName,
             packageName = packageName,
             title = title,
-            content = text
+            content = content
         )
         settings.addLog(logEntry)
 
@@ -205,8 +219,6 @@ class NotifyListenerService : NotificationListenerService() {
         val headersString = com.google.gson.Gson().toJson(settings.getHeadersMap())
 
         // === Use WorkManager for GUARANTEED delivery ===
-        // WorkManager survives process death - Android will execute even if app is killed
-        // Network constraint: wait for internet before sending (prevents permanent failure on temp network loss)
         val constraints = androidx.work.Constraints.Builder()
             .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
             .build()
@@ -219,7 +231,7 @@ class NotifyListenerService : NotificationListenerService() {
                     SendWorker.KEY_APP_NAME to appName,
                     SendWorker.KEY_PACKAGE_NAME to packageName,
                     SendWorker.KEY_TITLE to title,
-                    SendWorker.KEY_CONTENT to text,
+                    SendWorker.KEY_CONTENT to content,
                     SendWorker.KEY_DEVICE_NAME to settings.deviceName,
                     SendWorker.KEY_PARAMS_TEMPLATE to settings.webhookParams,
                     SendWorker.KEY_HEADERS_JSON to headersString,
@@ -230,7 +242,7 @@ class NotifyListenerService : NotificationListenerService() {
             )
             .setBackoffCriteria(
                 BackoffPolicy.LINEAR,
-                15, // 15 seconds between retries
+                15,
                 TimeUnit.SECONDS
             )
             .build()
@@ -241,7 +253,7 @@ class NotifyListenerService : NotificationListenerService() {
         // Notify UI
         try {
             val updateIntent = Intent("com.ttonline.gachno.LOG_UPDATED")
-            updateIntent.setPackage(packageName)
+            updateIntent.setPackage(this.packageName)
             sendBroadcast(updateIntent)
         } catch (_: Exception) {}
     }
