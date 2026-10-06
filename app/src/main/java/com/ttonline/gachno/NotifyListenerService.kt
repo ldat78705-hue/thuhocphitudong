@@ -189,10 +189,17 @@ class NotifyListenerService : NotificationListenerService() {
         content: String,
         webhookUrl: String
     ) {
-        // Duplicate check
-        if (settings.isDuplicate(packageName, title, content, sbn.key, sbn.postTime)) {
+        // Extract transaction ID (FT code) for precise dedup
+        // Synced with server v2 which uses transactionId for idempotent dedup
+        val transactionId = extractTransactionId(content)
+        if (transactionId != null) {
+            Log.d(TAG, ">>> TransactionId extracted: $transactionId")
+        }
+
+        // Duplicate check - uses transactionId when available, falls back to full string
+        if (settings.isDuplicate(packageName, title, content, sbn.key, sbn.postTime, transactionId)) {
             Log.w(TAG, "<<< SKIP duplicate: pkg=$packageName " +
-                    "title='$title' content='${content.take(100)}...'")
+                    "txId=$transactionId content='${content.take(100)}...'")
             return
         }
 
@@ -248,7 +255,7 @@ class NotifyListenerService : NotificationListenerService() {
             .build()
 
         WorkManager.getInstance(applicationContext).enqueue(workRequest)
-        Log.d(TAG, ">>> WorkManager enqueued for: $appName")
+        Log.d(TAG, ">>> WorkManager enqueued for: $appName (txId=$transactionId)")
 
         // Notify UI
         try {
@@ -256,6 +263,33 @@ class NotifyListenerService : NotificationListenerService() {
             updateIntent.setPackage(this.packageName)
             sendBroadcast(updateIntent)
         } catch (_: Exception) {}
+    }
+
+    /**
+     * Extract unique transaction ID from bank notification content.
+     * Used for precise dedup - same FT code = same transaction regardless of text truncation.
+     *
+     * Supported patterns:
+     * - MB Bank: FT26279025922201 (FT + 14-17 digits)
+     * - Vietcombank: CT từ ... (mã GD after "Ma GD" or "MGĐ")
+     * - Techcombank: FT code in content
+     * - BIDV: mã GD pattern
+     * - Generic: any FT/CT followed by digits
+     */
+    private fun extractTransactionId(text: String): String? {
+        // Pattern 1: FT + 14-17 digits (MB Bank, Techcombank)
+        val ftMatch = Regex("FT\\d{14,17}").find(text)
+        if (ftMatch != null) return ftMatch.value
+
+        // Pattern 2: "Ma GD" or "MGD" followed by alphanumeric code
+        val mgdMatch = Regex("(?:Ma GD|MGD|Ma giao dich)[:\\s]*([A-Za-z0-9]+)", RegexOption.IGNORE_CASE).find(text)
+        if (mgdMatch != null) return mgdMatch.groupValues[1]
+
+        // Pattern 3: "ACSP/" or "Ma GD ACSP/" followed by code (MB Bank alternate format)
+        val acspMatch = Regex("ACSP/\\s*([A-Za-z0-9]+)").find(text)
+        if (acspMatch != null) return "ACSP_${acspMatch.groupValues[1]}"
+
+        return null
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {

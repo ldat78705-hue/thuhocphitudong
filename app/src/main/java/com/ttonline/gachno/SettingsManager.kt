@@ -185,27 +185,24 @@ class SettingsManager(context: Context) {
     /**
      * Detects true duplicate notifications using ConcurrentHashMap (thread-safe).
      *
-     * FINGERPRINT DESIGN (reviewed by 5 roles, v1.9.5):
-     *   fingerprint = packageName + "|" + title + "|" + content
+     * DEDUP STRATEGY (v2.0.3 - synced with server v2):
      *
-     * WHY full string (not hashCode):
-     * - hashCode() is 32-bit → collision risk (2 different GD could match)
-     * - Full string comparison = ZERO collision risk
-     * - ConcurrentHashMap supports String keys of any length
-     * - Memory impact negligible: entries expire after 5s, max ~10 entries
+     * Priority 1: transactionId (FT code) — when available
+     *   - FT26279025922201 is UNIQUE per bank transaction
+     *   - Solves InboxStyle truncation: same FT code in full text AND truncated text
+     *   - Synced with server using transactionId for idempotent gạch nợ
      *
-     * WHY include title:
-     * - Some banks put amount in title (e.g. "Nhận +500,000đ")
-     * - Without title, 2 GD with same content but different title → falsely skipped
+     * Priority 2: full string fingerprint — fallback for non-bank notifications
+     *   - packageName + title + content
+     *   - Zero collision risk
      *
      * THREAD SAFETY:
      * - ConcurrentHashMap.putIfAbsent() is ATOMIC
-     * - No read-then-write gap (unlike SharedPreferences approach)
-     * - 2 threads with same fingerprint: only 1st wins → no race condition
-     * - 2 threads with different fingerprints: both succeed → no data loss
+     * - No read-then-write gap
      */
     fun isDuplicate(packageName: String, title: String, content: String,
-                    notifKey: String, postTime: Long): Boolean {
+                    notifKey: String, postTime: Long,
+                    transactionId: String? = null): Boolean {
         val interval = duplicateInterval
         if (interval <= 0) return false
 
@@ -213,24 +210,43 @@ class SettingsManager(context: Context) {
         val intervalMs = interval * 1000L
 
         // === Cleanup expired entries (non-blocking) ===
-        // Size guard: prevent unbounded growth in burst scenarios
         if (dedupCache.size > 100) dedupCache.clear()
         val expiredKeys = dedupCache.entries
             .filter { (now - it.value) > intervalMs }
             .map { it.key }
         expiredKeys.forEach { dedupCache.remove(it) }
 
-        // === Build fingerprint from FULL content (no hash) ===
-        // Include title + content for zero-collision dedup
-        val fingerprint = "$packageName|$title|$content"
+        // === Priority 1: TransactionId-based dedup (precise) ===
+        // When FT code is available, use it as THE key.
+        // Same FT code = same transaction, regardless of text truncation.
+        if (!transactionId.isNullOrEmpty()) {
+            val txKey = "TX:$packageName|$transactionId"
+            val existingTimestamp = dedupCache.putIfAbsent(txKey, now)
 
-        // === Atomic duplicate check ===
+            if (existingTimestamp != null) {
+                val age = now - existingTimestamp
+                if (age <= intervalMs) {
+                    Log.w(TAG, "<<< DUPLICATE by TransactionId: $transactionId " +
+                            "age=${age}ms interval=${intervalMs}ms")
+                    return true
+                } else {
+                    dedupCache[txKey] = now
+                    return false
+                }
+            }
+
+            Log.d(TAG, ">>> New transaction by ID: $transactionId")
+            return false
+        }
+
+        // === Priority 2: Full string fingerprint (fallback) ===
+        val fingerprint = "$packageName|$title|$content"
         val existingTimestamp = dedupCache.putIfAbsent(fingerprint, now)
 
         if (existingTimestamp != null) {
             val age = now - existingTimestamp
             if (age <= intervalMs) {
-                Log.w(TAG, "<<< DUPLICATE DETECTED: pkg=$packageName " +
+                Log.w(TAG, "<<< DUPLICATE by fingerprint: pkg=$packageName " +
                         "title='${title.take(30)}' content='${content.take(60)}...' " +
                         "age=${age}ms interval=${intervalMs}ms")
                 return true
