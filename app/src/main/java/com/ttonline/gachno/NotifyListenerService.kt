@@ -35,9 +35,12 @@ class NotifyListenerService : NotificationListenerService() {
             private set
 
         // Pre-compiled regex patterns for transaction ID extraction (avoid recompilation per call)
-        private val REGEX_FT = Regex("FT\\d{5,}")
-        private val REGEX_MGD = Regex("(?:Ma GD|MGD|Ma giao dich)[:\\s]*([A-Za-z0-9]+)", RegexOption.IGNORE_CASE)
-        private val REGEX_ACSP = Regex("ACSP/\\s*([A-Za-z0-9]+)")
+        // Order matters: most specific first, most generic last
+        private val REGEX_FT = Regex("FT\\d{5,}")                          // MB Bank, Techcombank, ACB
+        private val REGEX_ACSP = Regex("ACSP/\\s*([A-Za-z0-9]+)")          // MB Bank alternate
+        private val REGEX_MGD = Regex("(?:Ma GD|MGD|Ma giao dich)[:\\s]*([A-Za-z0-9]+)", RegexOption.IGNORE_CASE) // VCB, Sacombank, TPBank
+        private val REGEX_VPBFT = Regex("VPBFT(\\d{5,})")                  // VPBank: VPBFT12345678
+        private val REGEX_GD = Regex("(?:So GD|GD)[:\\s]+(\\d{6,})")       // BIDV: GD: 12345678
     }
 
     private lateinit var settings: SettingsManager
@@ -295,6 +298,16 @@ class NotifyListenerService : NotificationListenerService() {
         // Pattern 3: "Ma GD" or "MGD" followed by alphanumeric code (non-ACSP)
         val mgdMatch = REGEX_MGD.find(text)
         if (mgdMatch != null) return mgdMatch.groupValues[1]
+
+        // Pattern 4: VPBank "VPBFT12345678" — VPB prefix before FT
+        // Only reached when REGEX_FT (pure FT\d+) didn't match
+        val vpbMatch = REGEX_VPBFT.find(text)
+        if (vpbMatch != null) return "VPBFT${vpbMatch.groupValues[1]}"
+
+        // Pattern 5: BIDV "GD: 12345678" or "So GD: 12345678"
+        // Requires 6+ digits to avoid false match on short numbers
+        val gdMatch = REGEX_GD.find(text)
+        if (gdMatch != null) return "GD_${gdMatch.groupValues[1]}"
 
         return null
     }
