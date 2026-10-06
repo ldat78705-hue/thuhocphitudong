@@ -30,8 +30,14 @@ class NotifyListenerService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "GachNo"
+        @Volatile
         var isRunning = false
             private set
+
+        // Pre-compiled regex patterns for transaction ID extraction (avoid recompilation per call)
+        private val REGEX_FT = Regex("FT\\d{5,}")
+        private val REGEX_MGD = Regex("(?:Ma GD|MGD|Ma giao dich)[:\\s]*([A-Za-z0-9]+)", RegexOption.IGNORE_CASE)
+        private val REGEX_ACSP = Regex("ACSP/\\s*([A-Za-z0-9]+)")
     }
 
     private lateinit var settings: SettingsManager
@@ -278,18 +284,15 @@ class NotifyListenerService : NotificationListenerService() {
      */
     private fun extractTransactionId(text: String): String? {
         // Pattern 1: FT + digits (MB Bank, Techcombank)
-        // Use FT\d{5,} not FT\d{14,17} — InboxStyle truncates text, so FT code
-        // may be cut to FT26279 (only 5 digits). We need to match truncated codes too.
-        // Minimum 5 digits to avoid false matches on short strings.
-        val ftMatch = Regex("FT\\d{5,}").find(text)
+        val ftMatch = REGEX_FT.find(text)
         if (ftMatch != null) return ftMatch.value
 
         // Pattern 2: "Ma GD" or "MGD" followed by alphanumeric code
-        val mgdMatch = Regex("(?:Ma GD|MGD|Ma giao dich)[:\\s]*([A-Za-z0-9]+)", RegexOption.IGNORE_CASE).find(text)
+        val mgdMatch = REGEX_MGD.find(text)
         if (mgdMatch != null) return mgdMatch.groupValues[1]
 
-        // Pattern 3: "ACSP/" or "Ma GD ACSP/" followed by code (MB Bank alternate format)
-        val acspMatch = Regex("ACSP/\\s*([A-Za-z0-9]+)").find(text)
+        // Pattern 3: "ACSP/" followed by code (MB Bank alternate format)
+        val acspMatch = REGEX_ACSP.find(text)
         if (acspMatch != null) return "ACSP_${acspMatch.groupValues[1]}"
 
         return null
