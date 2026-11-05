@@ -64,12 +64,14 @@ class NotifyListenerService : NotificationListenerService() {
         private val REGEX_VPBFT = Regex("VPBFT(\\d{5,})")                  // VPBank
         private val REGEX_GD = Regex("(?:So GD|GD)[:\\s]+(\\d{6,})")       // BIDV
         private val REGEX_HS = Regex("HS(\\d{3,})")                        // HOC PHI HS193, HS184 — v2.1.5
-        // Amount extraction — 2 patterns ordered by precision:
-        // Pattern A (preferred): "+400,000 VND" — always the RECEIVED amount, never SD (balance)
-        // Pattern B (fallback):  "400,000 VND" — may match SD if + is missing
-        // Using Pattern A first prevents matching "SD: 1,200,000 VND" as the transaction amount
+        // Amount extraction — 3 patterns ordered by precision:
+        // Pattern A (best):     "+400,000 VND" — explicit received amount with currency
+        // Pattern B (good):     "400,000 VND" — amount with currency, may match SD
+        // Pattern C (fallback): "+400,000" or "+400.000" — amount without currency suffix
+        // Using A→B→C priority prevents matching SD or unrelated numbers
         private val REGEX_AMOUNT_PLUS = Regex("\\+(\\d[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
         private val REGEX_AMOUNT_ANY = Regex("(\\d{4,}[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
+        private val REGEX_AMOUNT_RAW = Regex("\\+(\\d[\\d.,]{2,})")  // +400,000 without VND
     }
 
     /**
@@ -308,7 +310,10 @@ class NotifyListenerService : NotificationListenerService() {
         webhookUrl: String
     ) {
         // Extract transaction ID for precise dedup
-        val transactionId = extractTransactionId(content)
+        // Pass title + content because MB Bank puts amount in title ("+400,000 VND")
+        // while HS code is in content ("CUSTOMER HOC PHI HS193. TU: QUACH THI HANG")
+        val fullText = "$title $content"
+        val transactionId = extractTransactionId(fullText)
         if (transactionId != null) {
             Log.d(TAG, ">>> TransactionId extracted: $transactionId")
         }
@@ -442,9 +447,13 @@ class NotifyListenerService : NotificationListenerService() {
         val hsMatch = REGEX_HS.find(text)
         if (hsMatch != null) {
             val hsCode = hsMatch.groupValues[1]
-            // Extract amount: prefer "+400,000 VND" (always transaction amount)
-            // over "1,200,000 VND" (could be balance SD)
-            val amountMatch = REGEX_AMOUNT_PLUS.find(text) ?: REGEX_AMOUNT_ANY.find(text)
+            // Extract amount: A→B→C priority chain
+            // A: "+400,000 VND" (explicit, best)
+            // B: "400,000 VND" (may match SD, but better than nothing)
+            // C: "+400,000" (no currency suffix, e.g. title "+400,000")
+            val amountMatch = REGEX_AMOUNT_PLUS.find(text)
+                ?: REGEX_AMOUNT_ANY.find(text)
+                ?: REGEX_AMOUNT_RAW.find(text)
             val amount = amountMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
             return if (amount.isNotEmpty()) "HS_${hsCode}_$amount" else "HS_$hsCode"
         }

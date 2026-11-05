@@ -291,6 +291,37 @@ class SettingsManager(context: Context) {
                 }
             }
 
+            // Step 3: HS prefix match (InboxStyle line without amount vs bigText with amount)
+            // InboxStyle line: "CUSTOMER HOC PHI HS193..." → txId "HS_193" (no amount)
+            // bigText (already forwarded): "...+400,000 VND...HS193" → txId "HS_193_400000"
+            // "HS_193" is a PREFIX of "HS_193_400000" → same transaction → DUPLICATE
+            if (transactionId.startsWith("HS_")) {
+                val hsEntry = dedupCache.entries.firstOrNull { entry ->
+                    if (entry.key == txKey) return@firstOrNull false
+                    if (!entry.key.startsWith(txPrefix)) return@firstOrNull false
+                    val existingTxId = entry.key.substringAfter(txPrefix)
+                    if (!existingTxId.startsWith("HS_")) return@firstOrNull false
+                    // "HS_193" matches "HS_193_400000" (prefix) — same HS, different detail level
+                    existingTxId.startsWith(transactionId) || transactionId.startsWith(existingTxId)
+                }
+
+                if (hsEntry != null) {
+                    val age = now - hsEntry.value
+                    if (age <= txIntervalMs) {
+                        Log.w(TAG, "<<< DUPLICATE by HS prefix: " +
+                                "new=$transactionId existing=${hsEntry.key.substringAfter(txPrefix)} " +
+                                "age=${age}ms")
+                        // Keep the MORE SPECIFIC key (with amount), remove generic
+                        if (txKey.length > hsEntry.key.length) {
+                            dedupCache.remove(hsEntry.key)
+                        } else {
+                            dedupCache.remove(txKey)
+                        }
+                        return true
+                    }
+                }
+            }
+
             Log.d(TAG, ">>> New transaction by ID: $transactionId")
             return false
         }

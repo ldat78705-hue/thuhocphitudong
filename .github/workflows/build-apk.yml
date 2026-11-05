@@ -90,6 +90,18 @@ jobs:
         VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+    - name: List and rename APK
+      run: |
+        echo "=== Release APK files ==="
+        find app/build/outputs/apk/ -name "*.apk" -type f
+        # Rename for clarity
+        for f in app/build/outputs/apk/release/*.apk; do
+          if [ -f "$f" ]; then
+            cp "$f" "app/build/outputs/apk/release/GachNo-v${{ steps.version.outputs.version }}.apk"
+            echo "Renamed: $f -> GachNo-v${{ steps.version.outputs.version }}.apk"
+          fi
+        done
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
