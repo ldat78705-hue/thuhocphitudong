@@ -64,6 +64,9 @@ class NotifyListenerService : NotificationListenerService() {
         private val REGEX_VPBFT = Regex("VPBFT(\\d{5,})")                  // VPBank
         private val REGEX_GD = Regex("(?:So GD|GD)[:\\s]+(\\d{6,})")       // BIDV
         private val REGEX_HS = Regex("HS(\\d{3,})")                        // HOC PHI HS193, HS184 — v2.1.5
+        // Amount extraction: "+400,000" or "+1.500.000" or "400000" — used to distinguish
+        // 2 different payments for the same HS code (e.g. father + mother both pay HS193)
+        private val REGEX_AMOUNT = Regex("\\+?([\\d.,]+)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
     }
 
     /**
@@ -85,6 +88,7 @@ class NotifyListenerService : NotificationListenerService() {
         val flags: Int
     )
 
+    @Volatile
     private lateinit var settings: SettingsManager
 
     override fun onCreate() {
@@ -423,10 +427,22 @@ class NotifyListenerService : NotificationListenerService() {
         // Pattern 6: HOC PHI HS code — "CUSTOMER HOC PHI HS193" or "HOC PHI HS184"
         // CRITICAL for gạch nợ: this is the ONLY unique identifier in the MB Bank
         // HOC PHI notification format (no FT/ACSP code present).
-        // Without this, 2 payments from QUACH THI HANG (HS193 + HS184) with
-        // truncated InboxStyle lines could be deduped as false positives.
+        //
+        // Combine HS code + amount to create a unique ID. This handles the case where
+        // 2 different people pay for the SAME HS code (e.g. father pays 200K, mother pays 300K).
+        // Without amount: both → "HS_193" → dedup drops the second one → LOST.
+        // With amount: "HS_193_200000" ≠ "HS_193_300000" → both forwarded.
+        //
+        // Edge case: same person pays same HS same amount twice → dedup correctly blocks.
+        // This is desired behavior: true duplicate from Android re-posting the notification.
         val hsMatch = REGEX_HS.find(text)
-        if (hsMatch != null) return "HS_${hsMatch.groupValues[1]}"
+        if (hsMatch != null) {
+            val hsCode = hsMatch.groupValues[1]
+            // Extract amount and strip formatting (commas, dots) to normalize
+            val amountMatch = REGEX_AMOUNT.find(text)
+            val amount = amountMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
+            return if (amount.isNotEmpty()) "HS_${hsCode}_$amount" else "HS_$hsCode"
+        }
 
         return null
     }

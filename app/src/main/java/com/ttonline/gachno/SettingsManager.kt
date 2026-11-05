@@ -223,49 +223,83 @@ class SettingsManager(context: Context) {
         if (dedupCache.size > 1000) dedupCache.clear()
 
         // === Priority 1: TransactionId-based dedup (precise) ===
-        // When FT code is available, use it as THE key.
-        // Same FT code = same transaction, regardless of text truncation.
-        // Use PREFIX matching: FT2627902 (truncated) matches FT26279025922201 (full)
-        // Use 24h TTL: FT codes are globally unique, bank may resend hours later
         if (!transactionId.isNullOrEmpty()) {
             val txPrefix = "TX:$packageName|"
             val txKey = "$txPrefix$transactionId"
             val txIntervalMs = 24 * 60 * 60 * 1000L // 24 hours for transaction IDs
 
-            // Prefix match: find any existing key where one FT starts with the other
-            val existingEntry = dedupCache.entries.firstOrNull { entry ->
-                if (!entry.key.startsWith(txPrefix)) return@firstOrNull false
-                val existingTxId = entry.key.substringAfter(txPrefix)
-                existingTxId.startsWith(transactionId) || transactionId.startsWith(existingTxId)
-            }
+            // -------------------------------------------------------
+            // STRATEGY: Use putIfAbsent() for EXACT match (ATOMIC, no race condition).
+            // Then do prefix scan ONLY for FT codes (InboxStyle truncation).
+            //
+            // WHY this matters:
+            // - putIfAbsent is a SINGLE atomic operation on ConcurrentHashMap
+            // - No gap between read and write → no race condition
+            // - 2 threads calling isDuplicate("HS_193") simultaneously:
+            //   Thread 1: putIfAbsent("TX:com.mb|HS_193", now) → null → NEW
+            //   Thread 2: putIfAbsent("TX:com.mb|HS_193", now) → returns Thread1's timestamp → DUPLICATE
+            // -------------------------------------------------------
 
-            if (existingEntry != null) {
-                val age = now - existingEntry.value
+            // Step 1: EXACT match using putIfAbsent (ATOMIC)
+            val existingTimestamp = dedupCache.putIfAbsent(txKey, now)
+            if (existingTimestamp != null) {
+                val age = now - existingTimestamp
                 if (age <= txIntervalMs) {
-                    Log.w(TAG, "<<< DUPLICATE by TransactionId prefix: " +
-                            "new=$transactionId existing=${existingEntry.key.substringAfter(txPrefix)} " +
-                            "age=${age}ms")
-                    // Keep the LONGER (more complete) key
-                    if (txKey.length > existingEntry.key.length) {
-                        dedupCache.remove(existingEntry.key)
-                        dedupCache[txKey] = existingEntry.value
-                    }
+                    Log.w(TAG, "<<< DUPLICATE by TransactionId EXACT: " +
+                            "txId=$transactionId age=${age}ms")
                     return true
                 } else {
-                    dedupCache.remove(existingEntry.key)
+                    // Expired — refresh
                     dedupCache[txKey] = now
+                    Log.d(TAG, ">>> Expired TX entry refreshed: $transactionId")
                     return false
                 }
             }
 
-            // No prefix match found — new transaction
-            dedupCache[txKey] = now
+            // Step 2: PREFIX match ONLY for FT codes (InboxStyle truncation protection)
+            // FT codes can be truncated in InboxStyle: "FT2627902" (truncated) vs "FT26279025922201" (full)
+            // Other types (HS, ACSP, MGD, GD, VPBFT) are NEVER truncated → use EXACT match only
+            //
+            // WHY only FT: InboxStyle cuts at ~45 chars. FT codes are typically at the END
+            // of the notification text, so they get cut. HS/MGD/ACSP are short and at the
+            // beginning, so they survive truncation intact.
+            if (transactionId.startsWith("FT") || transactionId.startsWith("VPBFT")) {
+                val prefixEntry = dedupCache.entries.firstOrNull { entry ->
+                    if (entry.key == txKey) return@firstOrNull false // Skip self (just inserted)
+                    if (!entry.key.startsWith(txPrefix)) return@firstOrNull false
+                    val existingTxId = entry.key.substringAfter(txPrefix)
+                    // Only prefix match between FT-type codes
+                    if (!existingTxId.startsWith("FT") && !existingTxId.startsWith("VPBFT")) return@firstOrNull false
+                    existingTxId.startsWith(transactionId) || transactionId.startsWith(existingTxId)
+                }
+
+                if (prefixEntry != null) {
+                    val age = now - prefixEntry.value
+                    if (age <= txIntervalMs) {
+                        Log.w(TAG, "<<< DUPLICATE by FT prefix: " +
+                                "new=$transactionId existing=${prefixEntry.key.substringAfter(txPrefix)} " +
+                                "age=${age}ms")
+                        // Keep the LONGER (more complete) key, remove shorter
+                        if (txKey.length > prefixEntry.key.length) {
+                            dedupCache.remove(prefixEntry.key)
+                            // txKey already inserted by putIfAbsent above
+                        } else {
+                            dedupCache.remove(txKey) // Remove shorter (self)
+                        }
+                        return true
+                    }
+                }
+            }
+
             Log.d(TAG, ">>> New transaction by ID: $transactionId")
             return false
         }
 
         // === Priority 2: Full string fingerprint (fallback) ===
-        val fingerprint = "$packageName|$title|$content"
+        // Include postTime (rounded to seconds) to distinguish 2 identical transfers
+        // at different times. Without this, "NGUYEN VAN A +500,000" sent twice in 5s
+        // would be deduped as false positive → LOST transaction.
+        val fingerprint = "$packageName|$title|$content|${postTime / 1000}"
         val existingTimestamp = dedupCache.putIfAbsent(fingerprint, now)
 
         if (existingTimestamp != null) {
