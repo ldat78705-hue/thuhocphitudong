@@ -291,24 +291,37 @@ class SettingsManager(context: Context) {
                 }
             }
 
-            // Step 3: HS prefix match (InboxStyle line without amount vs bigText with amount)
+            // Step 3: HS match (InboxStyle line without amount vs bigText with amount)
             // InboxStyle line: "CUSTOMER HOC PHI HS193..." → txId "HS_193" (no amount)
             // bigText (already forwarded): "...+400,000 VND...HS193" → txId "HS_193_400000"
-            // "HS_193" is a PREFIX of "HS_193_400000" → same transaction → DUPLICATE
+            //
+            // IMPORTANT: Only match when ONE side has amount and the OTHER doesn't.
+            // If BOTH have amounts (HS_193_200000 vs HS_193_300000), they are DIFFERENT
+            // transactions (father 200K + mother 300K) → must BOTH forward.
             if (transactionId.startsWith("HS_")) {
+                val parts = transactionId.removePrefix("HS_").split("_", limit = 2)
+                val myHsNum = parts[0]           // "193"
+                val myHasAmount = parts.size > 1  // true if "HS_193_400000"
+
                 val hsEntry = dedupCache.entries.firstOrNull { entry ->
                     if (entry.key == txKey) return@firstOrNull false
                     if (!entry.key.startsWith(txPrefix)) return@firstOrNull false
                     val existingTxId = entry.key.substringAfter(txPrefix)
                     if (!existingTxId.startsWith("HS_")) return@firstOrNull false
-                    // "HS_193" matches "HS_193_400000" (prefix) — same HS, different detail level
-                    existingTxId.startsWith(transactionId) || transactionId.startsWith(existingTxId)
+
+                    val existParts = existingTxId.removePrefix("HS_").split("_", limit = 2)
+                    val existHsNum = existParts[0]
+                    val existHasAmount = existParts.size > 1
+
+                    // Same student number AND at least one side has no amount
+                    // (= InboxStyle truncated version matching full bigText version)
+                    existHsNum == myHsNum && (!myHasAmount || !existHasAmount)
                 }
 
                 if (hsEntry != null) {
                     val age = now - hsEntry.value
                     if (age <= txIntervalMs) {
-                        Log.w(TAG, "<<< DUPLICATE by HS prefix: " +
+                        Log.w(TAG, "<<< DUPLICATE by HS number: " +
                                 "new=$transactionId existing=${hsEntry.key.substringAfter(txPrefix)} " +
                                 "age=${age}ms")
                         // Keep the MORE SPECIFIC key (with amount), remove generic
