@@ -64,9 +64,12 @@ class NotifyListenerService : NotificationListenerService() {
         private val REGEX_VPBFT = Regex("VPBFT(\\d{5,})")                  // VPBank
         private val REGEX_GD = Regex("(?:So GD|GD)[:\\s]+(\\d{6,})")       // BIDV
         private val REGEX_HS = Regex("HS(\\d{3,})")                        // HOC PHI HS193, HS184 — v2.1.5
-        // Amount extraction: "+400,000" or "+1.500.000" or "400000" — used to distinguish
-        // 2 different payments for the same HS code (e.g. father + mother both pay HS193)
-        private val REGEX_AMOUNT = Regex("\\+?([\\d.,]+)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
+        // Amount extraction — 2 patterns ordered by precision:
+        // Pattern A (preferred): "+400,000 VND" — always the RECEIVED amount, never SD (balance)
+        // Pattern B (fallback):  "400,000 VND" — may match SD if + is missing
+        // Using Pattern A first prevents matching "SD: 1,200,000 VND" as the transaction amount
+        private val REGEX_AMOUNT_PLUS = Regex("\\+(\\d[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
+        private val REGEX_AMOUNT_ANY = Regex("(\\d{4,}[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
     }
 
     /**
@@ -265,10 +268,11 @@ class NotifyListenerService : NotificationListenerService() {
                 Log.d(TAG, ">>> InboxStyle line[$i]: '${line.take(80)}'")
                 forwardFromSnapshot(snap, packageName, snap.title, line, webhookUrl)
             }
-            // ALSO process the main text/bigText if it contains content NOT in textLines
-            // This handles the case where InboxStyle summary differs from individual lines
-            if (text.isNotEmpty() && snap.textLines.none { text.startsWith(it.take(20)) }) {
-                Log.d(TAG, ">>> InboxStyle: main text differs from lines, also forwarding: '${text.take(80)}'")
+            // ALSO forward the main text/bigText — isDuplicate() will naturally skip it
+            // if it matches any InboxStyle line already forwarded above.
+            // This is safer than heuristic startsWith(take(20)) which could false-positive
+            // skip a genuine new transaction when names overlap.
+            if (text.isNotEmpty()) {
                 forwardFromSnapshot(snap, packageName, snap.title, text, webhookUrl)
             }
             return
@@ -438,8 +442,9 @@ class NotifyListenerService : NotificationListenerService() {
         val hsMatch = REGEX_HS.find(text)
         if (hsMatch != null) {
             val hsCode = hsMatch.groupValues[1]
-            // Extract amount and strip formatting (commas, dots) to normalize
-            val amountMatch = REGEX_AMOUNT.find(text)
+            // Extract amount: prefer "+400,000 VND" (always transaction amount)
+            // over "1,200,000 VND" (could be balance SD)
+            val amountMatch = REGEX_AMOUNT_PLUS.find(text) ?: REGEX_AMOUNT_ANY.find(text)
             val amount = amountMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
             return if (amount.isNotEmpty()) "HS_${hsCode}_$amount" else "HS_$hsCode"
         }
