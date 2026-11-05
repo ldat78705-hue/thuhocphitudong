@@ -8,6 +8,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -94,16 +97,19 @@ jobs:
         body: |
           ## GachNo v${{ steps.version.outputs.version }}
 
-          ### Thay đổi chính:
-          - Fix mất giao dịch khi nhiều khoản đến liên tiếp (MB Bank)
-          - Snapshot notification content ngay lập tức
-          - Async processing — không block binder thread
-          - Extract mã HS cho dedup chính xác
-          - Retry webhook 3 lần (thay vì 1)
+          ### 🔧 Sửa lỗi quan trọng:
+          - ✅ Không block binder thread — xử lý async, 10 GD cùng lúc không sót
+          - ✅ Snapshot notification ngay lập tức — chống mất dữ liệu khi bank update notif
+          - ✅ Extract mã HS + số tiền cho dedup chính xác (HS_193_400000)
+          - ✅ Atomic dedup (putIfAbsent) — không race condition giữa 2 thread
+          - ✅ FT-only prefix match — tránh dedup nhầm HS193/HS184
+          - ✅ Ưu tiên +amount — không match nhầm số dư SD
+          - ✅ Retry webhook 3 lần, backoff 15s
+          - ✅ WakeLock đúng thời điểm
 
-          ### Cài đặt:
+          ### 📱 Cài đặt:
           1. Tải file APK bên dưới
-          2. Cài đè lên phiên bản cũ
+          2. Cài đè lên phiên bản cũ (dữ liệu cấu hình giữ nguyên)
           3. Mở app → kiểm tra kết nối webhook
         files: |
           app/build/outputs/apk/release/*.apk
