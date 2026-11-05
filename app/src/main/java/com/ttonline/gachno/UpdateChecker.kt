@@ -61,15 +61,23 @@ class UpdateChecker(private val context: Context) {
             }
 
             // Check if user already skipped this version
-            val skipped = context.getSharedPreferences("gachno_prefs", Context.MODE_PRIVATE)
-                .getString(PREF_SKIPPED_VERSION, "")
+            val prefs = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                context.createDeviceProtectedStorageContext()
+                    .getSharedPreferences("gachno_prefs", Context.MODE_PRIVATE)
+            } else {
+                context.getSharedPreferences("gachno_prefs", Context.MODE_PRIVATE)
+            }
+            val skipped = prefs.getString(PREF_SKIPPED_VERSION, "")
             if (skipped == latestVersion) {
                 Log.d(TAG, "User skipped version $latestVersion")
                 return
             }
 
-            // Find APK asset
-            val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
+            // Find APK asset — prefer "GachNo-*.apk" over "app-release.apk"
+            val apkAsset = release.assets
+                .filter { it.name.endsWith(".apk") }
+                .sortedByDescending { it.name.startsWith("GachNo") }
+                .firstOrNull()
 
             // Show update dialog on main thread
             withContext(Dispatchers.Main) {
@@ -179,9 +187,13 @@ class UpdateChecker(private val context: Context) {
             }
             .setNegativeButton("Để sau", null)
             .setNeutralButton("Bỏ qua bản này") { _, _ ->
-                // Remember to skip this version
-                context.getSharedPreferences("gachno_prefs", Context.MODE_PRIVATE)
-                    .edit()
+                val skipPrefs = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    context.createDeviceProtectedStorageContext()
+                        .getSharedPreferences("gachno_prefs", Context.MODE_PRIVATE)
+                } else {
+                    context.getSharedPreferences("gachno_prefs", Context.MODE_PRIVATE)
+                }
+                skipPrefs.edit()
                     .putString(PREF_SKIPPED_VERSION, latestVersion)
                     .apply()
             }
