@@ -16,14 +16,36 @@ import androidx.work.workDataOf
 import java.util.concurrent.TimeUnit
 
 /**
- * Core notification listener service - matches SmsForwarder's NotificationService exactly.
+ * Core notification listener service.
  *
  * Key reliability mechanisms:
  * 1. onListenerDisconnected() → requestRebind() with CORRECT ComponentName
  * 2. WakeLock during notification processing to prevent CPU sleep
  * 3. WorkManager for webhook delivery (survives process death)
- * 4. EXTRA_BIG_TEXT extraction for full bank notification content
- * 5. tickerText fallback
+ * 4. SNAPSHOT content immediately to survive notification replacement
+ * 5. ASYNC processing — never block Android binder threads
+ * 6. EXTRA_BIG_TEXT extraction for full bank notification content
+ * 7. tickerText fallback
+ *
+ * v2.1.5 FIX — comprehensive fix for lost transactions:
+ *
+ * BUG 1 (CRITICAL): synchronized(this) blocked binder threads.
+ *   Android has ~16 binder threads. When 3 transactions arrive at 07:39-07:40,
+ *   synchronized caused thread 2+3 to WAIT while thread 1 processed. If the wait
+ *   exceeded ~5s, Android DROPPED the callback → transaction lost.
+ *   FIX: Process each snapshot on a NEW Thread. ConcurrentHashMap dedup is already
+ *   thread-safe. addLog uses its own logLock. No synchronized needed.
+ *
+ * BUG 2 (CRITICAL): extractTransactionId() returned null for "CUSTOMER HOC PHI HS193".
+ *   MB Bank HOC PHI format has NO FT/ACSP code → dedup fell back to fingerprint.
+ *   If InboxStyle truncated 2 lines identically → false positive duplicate → lost.
+ *   FIX: Added regex HS\d{3,} to extract HS code as transactionId.
+ *
+ * BUG 3 (MEDIUM): WakeLock acquired AFTER snapshot but BEFORE synchronized.
+ *   If thread waited on sync lock, WakeLock 30s timer ran out before processing.
+ *   FIX: WakeLock acquired inside async thread, right before processing.
+ *
+ * v2.1.4 FIX (retained): Snapshot pattern to survive notification replacement.
  */
 @Suppress("DEPRECATION")
 class NotifyListenerService : NotificationListenerService() {
@@ -38,10 +60,30 @@ class NotifyListenerService : NotificationListenerService() {
         // Order matters: most specific first, most generic last
         private val REGEX_FT = Regex("FT\\d{5,}")                          // MB Bank, Techcombank, ACB
         private val REGEX_ACSP = Regex("ACSP/\\s*([A-Za-z0-9]+)")          // MB Bank alternate
-        private val REGEX_MGD = Regex("(?:Ma GD|MGD|Ma giao dich)[:\\s]*([A-Za-z0-9]+)", RegexOption.IGNORE_CASE) // VCB, Sacombank, TPBank
-        private val REGEX_VPBFT = Regex("VPBFT(\\d{5,})")                  // VPBank: VPBFT12345678
-        private val REGEX_GD = Regex("(?:So GD|GD)[:\\s]+(\\d{6,})")       // BIDV: GD: 12345678
+        private val REGEX_MGD = Regex("(?:Ma GD|MGD|Ma giao dich)[:\\s]*([A-Za-z0-9]+)", RegexOption.IGNORE_CASE)
+        private val REGEX_VPBFT = Regex("VPBFT(\\d{5,})")                  // VPBank
+        private val REGEX_GD = Regex("(?:So GD|GD)[:\\s]+(\\d{6,})")       // BIDV
+        private val REGEX_HS = Regex("HS(\\d{3,})")                        // HOC PHI HS193, HS184 — v2.1.5
     }
+
+    /**
+     * Immutable snapshot of notification content.
+     * Captured IMMEDIATELY in onNotificationPosted() BEFORE any processing,
+     * so that MB Bank replacing the notification won't mutate our data.
+     */
+    private data class NotifSnapshot(
+        val packageName: String,
+        val key: String,
+        val id: Int,
+        val tag: String?,
+        val postTime: Long,
+        val title: String,
+        val text: String,
+        val bigText: String,
+        val textLines: List<String>,
+        val tickerText: String?,
+        val flags: Int
+    )
 
     private lateinit var settings: SettingsManager
 
@@ -67,50 +109,112 @@ class NotifyListenerService : NotificationListenerService() {
     /**
      * CRITICAL: Auto-reconnect when listener disconnects.
      * Uses NotifyListenerService::class.java (NOT base class!)
-     * This is what keeps the listener alive 24/7.
      */
     override fun onListenerDisconnected() {
         isRunning = false
         Log.w(TAG, "=== Listener DISCONNECTED - requesting rebind ===")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            // MUST use our own class, not the base NotificationListenerService
             requestRebind(ComponentName(this, NotifyListenerService::class.java))
             Log.d(TAG, "requestRebind() called for NotifyListenerService")
         }
     }
 
+    /**
+     * Called by Android when a notification is posted.
+     *
+     * CRITICAL DESIGN (v2.1.5):
+     * 1. SNAPSHOT content immediately (immutable copy)
+     * 2. LOG the snapshot (fast, non-blocking)
+     * 3. Process on ASYNC thread — NEVER block the binder thread
+     *
+     * WHY no synchronized:
+     * - Android binder thread pool has ~16 threads
+     * - If we block with synchronized, 3 rapid transactions exhaust the pool
+     * - Android DROPS callbacks when pool is exhausted → transactions LOST
+     * - ConcurrentHashMap dedup is already thread-safe
+     * - addLog() uses its own logLock
+     * - WorkManager.enqueue() is thread-safe
+     */
     @SuppressLint("DiscouragedPrivateApi")
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        // Acquire WakeLock to prevent CPU sleep during processing
-        var wakeLock: PowerManager.WakeLock? = null
-        try {
-            val pm = getSystemService(POWER_SERVICE) as PowerManager
-            wakeLock = pm.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK,
-                "GachNo:NotificationProcessing"
-            )
-            wakeLock.acquire(30_000) // 30 second max
+        if (sbn == null) return
 
-            // SYNCHRONIZED: Serialize notification processing to prevent race conditions
-            synchronized(this) {
-                processNotification(sbn)
-            }
+        // ============================================================
+        // STEP 1: SNAPSHOT content IMMEDIATELY on binder thread.
+        // This is FAST (just reading Bundle fields) — no blocking.
+        // MB Bank may replace the notification 1ms later, but our
+        // snapshot is already captured as an immutable data class.
+        // ============================================================
+        val snapshot = try {
+            val notification = sbn.notification ?: return
+            val extras = notification.extras ?: return
+            NotifSnapshot(
+                packageName = sbn.packageName ?: return,
+                key = sbn.key ?: "",
+                id = sbn.id,
+                tag = sbn.tag,
+                postTime = sbn.postTime,
+                title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: "",
+                text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: "",
+                bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: "",
+                textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+                    ?.mapNotNull { it?.toString() }
+                    ?.filter { it.isNotEmpty() }
+                    ?: emptyList(),
+                tickerText = notification.tickerText?.toString(),
+                flags = notification.flags
+            )
         } catch (e: Exception) {
-            Log.e(TAG, "Error processing notification: ${e.message}", e)
-        } finally {
-            try { if (wakeLock?.isHeld == true) wakeLock.release() } catch (_: Exception) {}
+            Log.e(TAG, "Error creating snapshot: ${e.message}", e)
+            return
         }
+
+        // Detailed log on binder thread (fast, non-blocking)
+        Log.d(TAG, ">>> NOTIF from: ${snapshot.packageName} " +
+                "key=${snapshot.key} id=${snapshot.id} tag=${snapshot.tag} " +
+                "postTime=${snapshot.postTime} " +
+                "flags=0x${snapshot.flags.toString(16)} " +
+                "textLines=${snapshot.textLines.size} " +
+                "title='${snapshot.title.take(40)}' " +
+                "text='${snapshot.text.take(60)}' " +
+                "bigText='${snapshot.bigText.take(60)}'")
+
+        // ============================================================
+        // STEP 2: Process on ASYNC thread — free binder thread IMMEDIATELY.
+        // This ensures Android can deliver the next notification callback
+        // without waiting for our processing to finish.
+        // WakeLock is acquired INSIDE the async thread to prevent CPU sleep.
+        // ============================================================
+        Thread {
+            var wakeLock: PowerManager.WakeLock? = null
+            try {
+                val pm = getSystemService(POWER_SERVICE) as PowerManager
+                wakeLock = pm.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK,
+                    "GachNo:NotifProcessing:${snapshot.id}"
+                )
+                wakeLock.acquire(30_000) // 30 second max
+
+                processSnapshot(snapshot)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing notification: ${e.message}", e)
+            } finally {
+                try { if (wakeLock?.isHeld == true) wakeLock.release() } catch (_: Exception) {}
+            }
+        }.start()
     }
 
-    private fun processNotification(sbn: StatusBarNotification?) {
-        // Skip null
-        val notification = sbn?.notification ?: return
-        val extras = notification.extras ?: return
-        val packageName = sbn.packageName ?: return
-
-        // Log EVERY notification
-        Log.d(TAG, ">>> NOTIF from: $packageName")
+    /**
+     * Process an immutable notification snapshot.
+     * Called on a background thread — safe to do slow operations.
+     * No synchronized needed — all shared state is already thread-safe:
+     * - dedupCache: ConcurrentHashMap
+     * - addLog: uses logLock
+     * - WorkManager.enqueue: thread-safe
+     */
+    private fun processSnapshot(snap: NotifSnapshot) {
+        val packageName = snap.packageName
 
         // Check forwarding enabled
         if (!settings.isForwardingEnabled) {
@@ -137,76 +241,72 @@ class NotifyListenerService : NotificationListenerService() {
             return
         }
 
-        // === Extract title ===
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
-
-        // === Extract text (same logic as SmsForwarder) ===
-        var text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        // === Determine the best content text ===
+        var text = snap.text
 
         // Try BIG_TEXT - crucial for bank notifications!
-        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
-        if (bigText.isNotEmpty()) {
-            text = bigText
+        if (snap.bigText.isNotEmpty()) {
+            text = snap.bigText
         }
 
         // === EXTRA_TEXT_LINES: InboxStyle support ===
         // MB Bank groups multiple transactions into a single InboxStyle notification.
-        // When 2 GDs arrive at the SAME second (e.g. NGUYEN THI YEN pays HS093 + HS006 at 20:07),
-        // Android may send ONLY ONE InboxStyle notification containing BOTH lines.
-        // We must process ALL lines individually and use isDuplicate to skip already-forwarded ones.
-        //
-        // Flow: GD1(HS093) + GD2(HS006) arrive at 20:07 →
-        //   Android sends 1 InboxStyle with textLines = ["...HS093...", "...HS006..."]
-        //   We process EACH line: HS093 → new → forward ✅, HS006 → new → forward ✅
-        //   If GD1 was already sent as standalone: HS093 → isDuplicate → skip ✅
-        val textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-        if (textLines != null && textLines.isNotEmpty()) {
-            Log.d(TAG, ">>> InboxStyle detected: ${textLines.size} lines, processing ALL lines individually")
-            for (i in textLines.indices) {
-                val line = textLines[i]?.toString() ?: continue
-                if (line.isEmpty()) continue
-                // Forward each line as a separate transaction
-                forwardTransaction(sbn, packageName, title, line, webhookUrl)
+        // When 2+ GDs arrive close together (e.g. QUACH THI HANG pays HS193 + HS184),
+        // Android may send ONE InboxStyle notification containing ALL lines.
+        // We process ALL lines individually and use isDuplicate to skip already-forwarded ones.
+        if (snap.textLines.isNotEmpty()) {
+            Log.d(TAG, ">>> InboxStyle detected: ${snap.textLines.size} lines, processing ALL individually")
+            for (i in snap.textLines.indices) {
+                val line = snap.textLines[i]
+                Log.d(TAG, ">>> InboxStyle line[$i]: '${line.take(80)}'")
+                forwardFromSnapshot(snap, packageName, snap.title, line, webhookUrl)
             }
-            return // All lines processed individually, skip normal flow
+            // ALSO process the main text/bigText if it contains content NOT in textLines
+            // This handles the case where InboxStyle summary differs from individual lines
+            if (text.isNotEmpty() && snap.textLines.none { text.startsWith(it.take(20)) }) {
+                Log.d(TAG, ">>> InboxStyle: main text differs from lines, also forwarding: '${text.take(80)}'")
+                forwardFromSnapshot(snap, packageName, snap.title, text, webhookUrl)
+            }
+            return
         }
 
         // Fallback to tickerText
-        if (text.isEmpty() && notification.tickerText != null) {
-            text = notification.tickerText.toString()
+        if (text.isEmpty() && snap.tickerText != null) {
+            text = snap.tickerText
         }
 
         // Skip empty
-        if (title.isEmpty() && text.isEmpty()) {
+        if (snap.title.isEmpty() && text.isEmpty()) {
             Log.d(TAG, "<<< SKIP: empty title+text")
             return
         }
 
         // Forward single transaction (normal flow)
-        forwardTransaction(sbn, packageName, title, text, webhookUrl)
+        forwardFromSnapshot(snap, packageName, snap.title, text, webhookUrl)
     }
 
     /**
-     * Forward a single transaction to webhook.
+     * Forward a single transaction to webhook, using snapshot data.
      * Used by both normal notifications AND each InboxStyle line.
      * isDuplicate() prevents sending the same content twice.
+     *
+     * Thread-safe: ConcurrentHashMap dedup + logLock for addLog.
      */
-    private fun forwardTransaction(
-        sbn: StatusBarNotification,
+    private fun forwardFromSnapshot(
+        snap: NotifSnapshot,
         packageName: String,
         title: String,
         content: String,
         webhookUrl: String
     ) {
-        // Extract transaction ID (FT code) for precise dedup
-        // Synced with server v2 which uses transactionId for idempotent dedup
+        // Extract transaction ID for precise dedup
         val transactionId = extractTransactionId(content)
         if (transactionId != null) {
             Log.d(TAG, ">>> TransactionId extracted: $transactionId")
         }
 
         // Duplicate check - uses transactionId when available, falls back to full string
-        if (settings.isDuplicate(packageName, title, content, sbn.key, sbn.postTime, transactionId)) {
+        if (settings.isDuplicate(packageName, title, content, snap.key, snap.postTime, transactionId)) {
             Log.w(TAG, "<<< SKIP duplicate: pkg=$packageName " +
                     "txId=$transactionId content='${content.take(100)}...'")
             return
@@ -239,6 +339,12 @@ class NotifyListenerService : NotificationListenerService() {
             .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
             .build()
 
+        // Truncate content to prevent exceeding WorkManager 10KB data limit
+        val safeContent = if (content.length > 4000) content.take(4000) else content
+        val safeTemplate = settings.webhookParams.let {
+            if (it.length > 2000) it.take(2000) else it
+        }
+
         val workRequest = OneTimeWorkRequestBuilder<SendWorker>()
             .setConstraints(constraints)
             .setInputData(
@@ -247,9 +353,9 @@ class NotifyListenerService : NotificationListenerService() {
                     SendWorker.KEY_APP_NAME to appName,
                     SendWorker.KEY_PACKAGE_NAME to packageName,
                     SendWorker.KEY_TITLE to title,
-                    SendWorker.KEY_CONTENT to content,
+                    SendWorker.KEY_CONTENT to safeContent,
                     SendWorker.KEY_DEVICE_NAME to settings.deviceName,
-                    SendWorker.KEY_PARAMS_TEMPLATE to settings.webhookParams,
+                    SendWorker.KEY_PARAMS_TEMPLATE to safeTemplate,
                     SendWorker.KEY_HEADERS_JSON to headersString,
                     SendWorker.KEY_LOG_ID to logEntry.id,
                     SendWorker.KEY_TIMEOUT to settings.requestTimeout.toLong(),
@@ -276,14 +382,21 @@ class NotifyListenerService : NotificationListenerService() {
 
     /**
      * Extract unique transaction ID from bank notification content.
-     * Used for precise dedup - same FT code = same transaction regardless of text truncation.
+     * Used for precise dedup — same ID = same transaction regardless of text truncation.
      *
-     * Supported patterns:
-     * - MB Bank: FT26279025922201 (FT + 14-17 digits)
-     * - Vietcombank: CT từ ... (mã GD after "Ma GD" or "MGĐ")
-     * - Techcombank: FT code in content
-     * - BIDV: mã GD pattern
-     * - Generic: any FT/CT followed by digits
+     * v2.1.5: Added HS code extraction for HOC PHI format (Pattern 6).
+     * This is CRITICAL because MB Bank's "CUSTOMER HOC PHI HS193" format
+     * does NOT contain FT/ACSP codes. Without this, dedup falls back to
+     * fingerprint matching which can produce false positives when InboxStyle
+     * truncates two lines to identical prefixes.
+     *
+     * Supported patterns (checked in order):
+     * 1. FT + digits     — MB Bank, Techcombank, ACB
+     * 2. ACSP/ + code    — MB Bank alternate
+     * 3. Ma GD + code    — VCB, Sacombank, TPBank
+     * 4. VPBFT + digits  — VPBank
+     * 5. GD: + digits    — BIDV
+     * 6. HS + digits     — HOC PHI (gạch nợ hệ thống) ← NEW v2.1.5
      */
     private fun extractTransactionId(text: String): String? {
         // Pattern 1: FT + digits (MB Bank, Techcombank)
@@ -300,14 +413,20 @@ class NotifyListenerService : NotificationListenerService() {
         if (mgdMatch != null) return mgdMatch.groupValues[1]
 
         // Pattern 4: VPBank "VPBFT12345678" — VPB prefix before FT
-        // Only reached when REGEX_FT (pure FT\d+) didn't match
         val vpbMatch = REGEX_VPBFT.find(text)
         if (vpbMatch != null) return "VPBFT${vpbMatch.groupValues[1]}"
 
         // Pattern 5: BIDV "GD: 12345678" or "So GD: 12345678"
-        // Requires 6+ digits to avoid false match on short numbers
         val gdMatch = REGEX_GD.find(text)
         if (gdMatch != null) return "GD_${gdMatch.groupValues[1]}"
+
+        // Pattern 6: HOC PHI HS code — "CUSTOMER HOC PHI HS193" or "HOC PHI HS184"
+        // CRITICAL for gạch nợ: this is the ONLY unique identifier in the MB Bank
+        // HOC PHI notification format (no FT/ACSP code present).
+        // Without this, 2 payments from QUACH THI HANG (HS193 + HS184) with
+        // truncated InboxStyle lines could be deduped as false positives.
+        val hsMatch = REGEX_HS.find(text)
+        if (hsMatch != null) return "HS_${hsMatch.groupValues[1]}"
 
         return null
     }

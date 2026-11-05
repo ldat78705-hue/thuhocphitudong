@@ -134,7 +134,7 @@ class SettingsManager(context: Context) {
 
     // --- Retry Times ---
     var retryTimes: Int
-        get() = prefs.getInt(KEY_RETRY_TIMES, 1)
+        get() = prefs.getInt(KEY_RETRY_TIMES, 3)
         set(value) = prefs.edit().putInt(KEY_RETRY_TIMES, value).apply()
 
     // --- Request Timeout (seconds) ---
