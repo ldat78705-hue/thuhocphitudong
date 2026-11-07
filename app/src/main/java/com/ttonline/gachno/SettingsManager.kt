@@ -242,8 +242,8 @@ class SettingsManager(context: Context) {
             // - putIfAbsent is a SINGLE atomic operation on ConcurrentHashMap
             // - No gap between read and write → no race condition
             // - 2 threads calling isDuplicate("HS_193") simultaneously:
-            //   Thread 1: putIfAbsent("TX:com.mb|HS_193", now) → null → NEW
-            //   Thread 2: putIfAbsent("TX:com.mb|HS_193", now) → returns Thread1's timestamp → DUPLICATE
+            //   Thread 1: putIfAbsent("TX:HS_193", now) → null → NEW
+            //   Thread 2: putIfAbsent("TX:HS_193", now) → returns Thread1's timestamp → DUPLICATE
             // -------------------------------------------------------
 
             // Step 1: EXACT match using putIfAbsent (ATOMIC)
