@@ -223,8 +223,14 @@ class SettingsManager(context: Context) {
         if (dedupCache.size > 1000) dedupCache.clear()
 
         // === Priority 1: TransactionId-based dedup (precise) ===
+        // NOTE: txKey does NOT include packageName!
+        // Same GD can arrive from BOTH push notification (com.mbmobile)
+        // AND SMS notification (com.google.android.apps.messaging).
+        // If we include packageName, they get different keys → both forward → DUPLICATE.
+        // By using "TX:" prefix without packageName, HS_073_500000 is deduped
+        // regardless of which app delivered it.
         if (!transactionId.isNullOrEmpty()) {
-            val txPrefix = "TX:$packageName|"
+            val txPrefix = "TX:"
             val txKey = "$txPrefix$transactionId"
             val txIntervalMs = 24 * 60 * 60 * 1000L // 24 hours for transaction IDs
 
@@ -298,6 +304,11 @@ class SettingsManager(context: Context) {
             // IMPORTANT: Only match when ONE side has amount and the OTHER doesn't.
             // If BOTH have amounts (HS_193_200000 vs HS_193_300000), they are DIFFERENT
             // transactions (father 200K + mother 300K) → must BOTH forward.
+            //
+            // EXCEPTION (Step 3b): Same HS, BOTH have amount, different amounts,
+            // AND within 60s → likely SAME GD from different sources (push vs SMS).
+            // Push may show total transfer amount, SMS may show HP amount only.
+            // Within 60s is too fast for 2 genuine separate payments to same student.
             if (transactionId.startsWith("HS_")) {
                 val parts = transactionId.removePrefix("HS_").split("_", limit = 2)
                 val myHsNum = parts[0]           // "193"
@@ -313,9 +324,16 @@ class SettingsManager(context: Context) {
                     val existHsNum = existParts[0]
                     val existHasAmount = existParts.size > 1
 
-                    // Same student number AND at least one side has no amount
-                    // (= InboxStyle truncated version matching full bigText version)
-                    existHsNum == myHsNum && (!myHasAmount || !existHasAmount)
+                    if (existHsNum != myHsNum) return@firstOrNull false
+
+                    // Case A: One side has no amount (InboxStyle vs bigText) → always match
+                    if (!myHasAmount || !existHasAmount) return@firstOrNull true
+
+                    // Case B: Both have amounts but DIFFERENT amounts → match ONLY within 60s
+                    // This handles push (+900,000 total) vs SMS (+500,000 HP only)
+                    // But allows father (200K at 10:00) + mother (300K at 10:30) to BOTH forward
+                    val age = now - entry.value
+                    age <= 60_000L  // 60 seconds threshold for cross-source dedup
                 }
 
                 if (hsEntry != null) {
