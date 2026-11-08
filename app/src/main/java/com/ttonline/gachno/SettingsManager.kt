@@ -315,17 +315,24 @@ class SettingsManager(context: Context) {
                     val existingTxId = entry.key.substringAfter(txPrefix)
                     if (!existingTxId.startsWith("HS_")) return@firstOrNull false
 
-                    // PREFIX match: one txId is a prefix of the other
-                    // This handles ALL InboxStyle vs bigText scenarios:
+                    // PREFIX match with underscore boundary:
+                    // One txId must be a prefix of the other, AND the longer one must
+                    // have "_" right after the shorter one ends. This prevents
+                    // "HS_100" from matching "HS_1003" (different students).
                     //
-                    // InboxStyle "HS_073"           PREFIX of bigText "HS_073_900000_25778420" ✅
-                    // InboxStyle "HS_073_900000"    PREFIX of bigText "HS_073_900000_25778420" ✅
-                    // bigText "HS_073_900000_25778420" PREFIX of InboxStyle "HS_073" ✅
+                    // InboxStyle "HS_073"           + "_" → "HS_073_900000_25778420".startsWith ✅
+                    // InboxStyle "HS_073_900000"    + "_" → "HS_073_900000_25778420".startsWith ✅
+                    // bigText "HS_073_900000_25778420" vs InboxStyle "HS_073" + "_" ✅
                     //
-                    // But NOT for different GDs (both have full SD):
-                    // Father "HS_073_300000_26000000" NOT PREFIX of Mother "HS_073_300000_26300000" ✅
-                    // Different amounts: "HS_073_800000_SD1" NOT PREFIX of "HS_073_600000_SD2" ✅
-                    existingTxId.startsWith(transactionId) || transactionId.startsWith(existingTxId)
+                    // But NOT cross-student:
+                    // "HS_100" + "_" → "HS_1003..." does NOT startWith "HS_100_" ✅
+                    // "HS_123" + "_" → "HS_1234..." does NOT startWith "HS_123_" ✅
+                    //
+                    // And NOT different GDs:
+                    // "HS_073_300000_26000000" NOT prefix of "HS_073_300000_26300000" ✅
+                    val shorter = if (transactionId.length <= existingTxId.length) transactionId else existingTxId
+                    val longer = if (transactionId.length <= existingTxId.length) existingTxId else transactionId
+                    longer.startsWith(shorter + "_") || transactionId == existingTxId
                 }
 
                 if (hsEntry != null) {

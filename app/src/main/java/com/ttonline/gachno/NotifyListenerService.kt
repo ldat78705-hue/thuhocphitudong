@@ -335,21 +335,41 @@ class NotifyListenerService : NotificationListenerService() {
         // This way, if SMS arrives 50ms later with txId="HS_073_900000",
         // its putIfAbsent will IMMEDIATELY find the alias → DUPLICATE.
         //
-        // REVERSE CHECK: If putIfAbsent returns non-null, it means SMS thread
-        // already forwarded this HS transaction → push is DUPLICATE too!
-        // This handles the race when SMS arrives BEFORE push.
+        // REVERSE CHECK: If SMS forwarded BEFORE push, dedupCache already has
+        // the SMS's HS txId. Check both EXACT match AND PREFIX match
+        // (SMS may have SD while push doesn't, or vice versa).
         if (transactionId != null && !transactionId.startsWith("HS_")) {
             val hsAlias = extractHsAlias(fullText)
             if (hsAlias != null) {
                 val aliasKey = "TX:$hsAlias"
-                val existingAlias = SettingsManager.dedupCache.putIfAbsent(aliasKey, System.currentTimeMillis())
+                val now = System.currentTimeMillis()
+                val existingAlias = SettingsManager.dedupCache.putIfAbsent(aliasKey, now)
                 if (existingAlias != null) {
-                    val age = System.currentTimeMillis() - existingAlias
-                    if (age <= 5_000L) { // Within 5s = same GD from different source
-                        Log.w(TAG, "<<< SKIP reverse-alias duplicate: " +
+                    val age = now - existingAlias
+                    if (age <= 5_000L) {
+                        Log.w(TAG, "<<< SKIP reverse-alias EXACT: " +
                                 "txId=$transactionId hsAlias=$hsAlias age=${age}ms")
                         return
                     }
+                }
+                // Also PREFIX scan: SMS may have stored "HS_073_900000_25778420" (with SD)
+                // while push alias is "HS_073_900000" (no SD) → different keys!
+                // PREFIX match catches this: "HS_073_900000_25778420".startsWith("HS_073_900000_")
+                val prefixHit = SettingsManager.dedupCache.entries.firstOrNull { entry ->
+                    if (entry.key == aliasKey) return@firstOrNull false
+                    if (!entry.key.startsWith("TX:HS_")) return@firstOrNull false
+                    val existTxId = entry.key.substringAfter("TX:")
+                    val shorter = if (hsAlias.length <= existTxId.length) hsAlias else existTxId
+                    val longer = if (hsAlias.length <= existTxId.length) existTxId else hsAlias
+                    val age = now - entry.value
+                    age <= 5_000L && (longer.startsWith(shorter + "_") || hsAlias == existTxId)
+                }
+                if (prefixHit != null) {
+                    val matchedTxId = prefixHit.key.substringAfter("TX:")
+                    Log.w(TAG, "<<< SKIP reverse-alias PREFIX: " +
+                            "txId=$transactionId hsAlias=$hsAlias " +
+                            "match=$matchedTxId")
+                    return
                 }
                 Log.d(TAG, ">>> Pre-registered HS alias: $hsAlias (primary: $transactionId)")
             }
