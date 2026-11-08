@@ -316,23 +316,31 @@ class SettingsManager(context: Context) {
                     if (!existingTxId.startsWith("HS_")) return@firstOrNull false
 
                     // PREFIX match with underscore boundary:
-                    // One txId must be a prefix of the other, AND the longer one must
-                    // have "_" right after the shorter one ends. This prevents
-                    // "HS_100" from matching "HS_1003" (different students).
+                    // ONLY match when the SHORTER txId has at least an amount part.
+                    // "HS_073" (code only, no amount) should NOT block "HS_073_300000_26M"
+                    // because the short entry lacks amount info → server can't ghi nợ →
+                    // the full SMS with correct amount MUST also forward.
                     //
-                    // InboxStyle "HS_073"           + "_" → "HS_073_900000_25778420".startsWith ✅
-                    // InboxStyle "HS_073_900000"    + "_" → "HS_073_900000_25778420".startsWith ✅
-                    // bigText "HS_073_900000_25778420" vs InboxStyle "HS_073" + "_" ✅
+                    // Match examples (shorter HAS amount):
+                    //   "HS_073_900000" + "_" → "HS_073_900000_25778420".startsWith ✅
+                    //   "HS_073_900000_25778420" vs "HS_073_900000" + "_" ✅
                     //
-                    // But NOT cross-student:
-                    // "HS_100" + "_" → "HS_1003..." does NOT startWith "HS_100_" ✅
-                    // "HS_123" + "_" → "HS_1234..." does NOT startWith "HS_123_" ✅
+                    // No match (shorter is code-only):
+                    //   "HS_099" + "_" → "HS_099_300000_26M".startsWith("HS_099_") 
+                    //   → YES syntactically, BUT shorter has no amount → SKIP this match!
                     //
-                    // And NOT different GDs:
-                    // "HS_073_300000_26000000" NOT prefix of "HS_073_300000_26300000" ✅
+                    // No match (cross-student):
+                    //   "HS_100" + "_" → "HS_1003_..." NOT startsWith ✅
+                    //
+                    // No match (different GDs):
+                    //   "HS_073_300000_26M" NOT prefix of "HS_073_300000_26.3M" ✅
                     val shorter = if (transactionId.length <= existingTxId.length) transactionId else existingTxId
                     val longer = if (transactionId.length <= existingTxId.length) existingTxId else transactionId
-                    longer.startsWith(shorter + "_") || transactionId == existingTxId
+                    // Shorter must have amount (at least 2 parts after "HS_": code + amount)
+                    // "HS_073" → removePrefix("HS_") = "073" → indexOf("_") = -1 → NO amount
+                    // "HS_073_900000" → removePrefix("HS_") = "073_900000" → indexOf("_") ≥ 0 → HAS amount
+                    val shorterHasAmount = shorter.removePrefix("HS_").indexOf('_') >= 0
+                    shorterHasAmount && (longer.startsWith(shorter + "_") || transactionId == existingTxId)
                 }
 
                 if (hsEntry != null) {

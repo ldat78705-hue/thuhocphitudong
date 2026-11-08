@@ -272,7 +272,7 @@ class NotifyListenerService : NotificationListenerService() {
             for (i in snap.textLines.indices) {
                 val line = snap.textLines[i]
                 Log.d(TAG, ">>> InboxStyle line[$i]: '${line.take(80)}'")
-                forwardFromSnapshot(snap, packageName, snap.title, line, webhookUrl)
+                forwardFromSnapshot(snap, packageName, snap.title, line, webhookUrl, isInboxStyleLine = true)
             }
             // ALSO forward the main text/bigText — isDuplicate() will naturally skip it
             // if it matches any InboxStyle line already forwarded above.
@@ -309,15 +309,26 @@ class NotifyListenerService : NotificationListenerService() {
         packageName: String,
         title: String,
         content: String,
-        webhookUrl: String
+        webhookUrl: String,
+        isInboxStyleLine: Boolean = false
     ) {
-        // Extract transaction ID for precise dedup
-        // Pass title + content because MB Bank puts amount in title ("+400,000 VND")
-        // while HS code is in content ("CUSTOMER HOC PHI HS193. TU: QUACH THI HANG")
-        val fullText = "$title $content"
+        // Extract transaction ID for precise dedup.
+        //
+        // CRITICAL: For InboxStyle lines, ONLY use content for txId extraction.
+        // Title contains the amount of the LAST transaction in the group (e.g. "+900,000 VND"),
+        // which is WRONG for other lines. If we include title, Line[1] "HS099 +300K real"
+        // gets txId "HS_099_900000" (from title) instead of "HS_099" (from content alone).
+        // This causes:
+        //   1. SMS "HS_099_300000_26078420" won't match "HS_099_900000" → DUPLICATE!
+        //   2. Server receives wrong amount in webhookContent
+        //
+        // For normal notifications, title + content is used because MB Bank splits data:
+        //   title: "+400,000 VND"
+        //   content: "CUSTOMER HOC PHI HS193. TU: QUACH THI HANG"
+        val fullText = if (isInboxStyleLine) content else "$title $content"
         val transactionId = extractTransactionId(fullText)
         if (transactionId != null) {
-            Log.d(TAG, ">>> TransactionId extracted: $transactionId")
+            Log.d(TAG, ">>> TransactionId extracted: $transactionId (inboxLine=$isInboxStyleLine)")
         }
 
         // Enrich content for webhook: if content doesn't contain amount but title does,
@@ -355,14 +366,16 @@ class NotifyListenerService : NotificationListenerService() {
                 // Also PREFIX scan: SMS may have stored "HS_073_900000_25778420" (with SD)
                 // while push alias is "HS_073_900000" (no SD) → different keys!
                 // PREFIX match catches this: "HS_073_900000_25778420".startsWith("HS_073_900000_")
+                // Only match when shorter has amount (not just HS code)
                 val prefixHit = SettingsManager.dedupCache.entries.firstOrNull { entry ->
                     if (entry.key == aliasKey) return@firstOrNull false
                     if (!entry.key.startsWith("TX:HS_")) return@firstOrNull false
                     val existTxId = entry.key.substringAfter("TX:")
                     val shorter = if (hsAlias.length <= existTxId.length) hsAlias else existTxId
                     val longer = if (hsAlias.length <= existTxId.length) existTxId else hsAlias
+                    val shorterHasAmount = shorter.removePrefix("HS_").indexOf('_') >= 0
                     val age = now - entry.value
-                    age <= 5_000L && (longer.startsWith(shorter + "_") || hsAlias == existTxId)
+                    age <= 5_000L && shorterHasAmount && (longer.startsWith(shorter + "_") || hsAlias == existTxId)
                 }
                 if (prefixHit != null) {
                     val matchedTxId = prefixHit.key.substringAfter("TX:")
