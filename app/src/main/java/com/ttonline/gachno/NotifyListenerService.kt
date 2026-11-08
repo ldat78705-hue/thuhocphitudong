@@ -72,6 +72,8 @@ class NotifyListenerService : NotificationListenerService() {
         private val REGEX_AMOUNT_PLUS = Regex("\\+(\\d[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
         private val REGEX_AMOUNT_ANY = Regex("(\\d{4,}[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
         private val REGEX_AMOUNT_RAW = Regex("\\+(\\d[\\d.,]{2,})")  // +400,000 without VND
+        // Balance (SD) extraction - disambiguate same HS + same amount from different GDs
+        private val REGEX_SD = Regex("SD[:\\s]*(\\d[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
     }
 
     /**
@@ -466,22 +468,31 @@ class NotifyListenerService : NotificationListenerService() {
         // Combine HS code + amount to create a unique ID. This handles the case where
         // 2 different people pay for the SAME HS code (e.g. father pays 200K, mother pays 300K).
         // Without amount: both → "HS_193" → dedup drops the second one → LOST.
-        // With amount: "HS_193_200000" ≠ "HS_193_300000" → both forwarded.
+        // With amount but no SD: "HS_193_300000" → same for both → LOST!
+        // With amount + SD: "HS_193_300000_26000000" ≠ "HS_193_300000_26300000" → BOTH forward!
         //
-        // Edge case: same person pays same HS same amount twice → dedup correctly blocks.
-        // This is desired behavior: true duplicate from Android re-posting the notification.
+        // Same GD from push + SMS: SAME SD → SAME txId → dedup correctly blocks.
         val hsMatch = REGEX_HS.find(text)
         if (hsMatch != null) {
             val hsCode = hsMatch.groupValues[1]
             // Extract amount: A→B→C priority chain
-            // A: "+400,000 VND" (explicit, best)
-            // B: "400,000 VND" (may match SD, but better than nothing)
-            // C: "+400,000" (no currency suffix, e.g. title "+400,000")
             val amountMatch = REGEX_AMOUNT_PLUS.find(text)
                 ?: REGEX_AMOUNT_ANY.find(text)
                 ?: REGEX_AMOUNT_RAW.find(text)
             val amount = amountMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
-            return if (amount.isNotEmpty()) "HS_${hsCode}_$amount" else "HS_$hsCode"
+            // Extract balance (SD) to disambiguate same HS + same amount
+            // CRITICAL: Father pays 300K for HS193 → SD=26,000,000
+            //           Mother pays 300K for HS193 → SD=26,300,000
+            // Without SD: both → "HS_193_300000" → DUPLICATE → LOST!
+            // With SD: "HS_193_300000_26000000" ≠ "HS_193_300000_26300000" → BOTH forward!
+            // Same GD push+SMS: both have SAME SD → SAME txId → DUPLICATE → correct!
+            val sdMatch = REGEX_SD.find(text)
+            val sd = sdMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
+            return when {
+                amount.isNotEmpty() && sd.isNotEmpty() -> "HS_${hsCode}_${amount}_$sd"
+                amount.isNotEmpty() -> "HS_${hsCode}_$amount"
+                else -> "HS_$hsCode"
+            }
         }
 
         return null
@@ -503,7 +514,13 @@ class NotifyListenerService : NotificationListenerService() {
             ?: REGEX_AMOUNT_ANY.find(text)
             ?: REGEX_AMOUNT_RAW.find(text)
         val amount = amountMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
-        return if (amount.isNotEmpty()) "HS_${hsCode}_$amount" else "HS_$hsCode"
+        val sdMatch = REGEX_SD.find(text)
+        val sd = sdMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
+        return when {
+            amount.isNotEmpty() && sd.isNotEmpty() -> "HS_${hsCode}_${amount}_$sd"
+            amount.isNotEmpty() -> "HS_${hsCode}_$amount"
+            else -> "HS_$hsCode"
+        }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
