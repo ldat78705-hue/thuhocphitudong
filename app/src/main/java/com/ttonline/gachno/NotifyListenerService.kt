@@ -272,7 +272,8 @@ class NotifyListenerService : NotificationListenerService() {
             for (i in snap.textLines.indices) {
                 val line = snap.textLines[i]
                 Log.d(TAG, ">>> InboxStyle line[$i]: '${line.take(80)}'")
-                forwardFromSnapshot(snap, packageName, snap.title, line, webhookUrl, isInboxStyleLine = true)
+                forwardFromSnapshot(snap, packageName, snap.title, line, webhookUrl,
+                    isInboxStyleLine = true, inboxLineIndex = i)
             }
             // ALSO forward the main text/bigText — isDuplicate() will naturally skip it
             // if it matches any InboxStyle line already forwarded above.
@@ -310,7 +311,8 @@ class NotifyListenerService : NotificationListenerService() {
         title: String,
         content: String,
         webhookUrl: String,
-        isInboxStyleLine: Boolean = false
+        isInboxStyleLine: Boolean = false,
+        inboxLineIndex: Int = -1
     ) {
         // Extract transaction ID for precise dedup.
         //
@@ -394,7 +396,9 @@ class NotifyListenerService : NotificationListenerService() {
         }
 
         // Duplicate check - uses transactionId when available, falls back to full string
-        if (settings.isDuplicate(packageName, title, content, snap.key, snap.postTime, transactionId)) {
+        // For InboxStyle lines, append line index to notifKey so fingerprint is unique per line
+        val notifKey = if (inboxLineIndex >= 0) "${snap.key}:LINE:$inboxLineIndex" else snap.key
+        if (settings.isDuplicate(packageName, title, content, notifKey, snap.postTime, transactionId)) {
             Log.w(TAG, "<<< SKIP duplicate: pkg=$packageName " +
                     "txId=$transactionId content='${content.take(100)}...'")
             return

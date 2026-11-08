@@ -71,6 +71,8 @@ class SettingsManager(context: Context) {
         // Pre-compiled regex for Priority 2 amount dedup
         private val REGEX_AMT = Regex("\\+(\\d[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
         private val REGEX_SEP = Regex("[.,]")
+        // Balance (SD) extraction — disambiguate 2 different GDs with same amount
+        private val REGEX_SD = Regex("SD[:\\s]*(\\d[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
     }
 
     private val prefs: SharedPreferences = run {
@@ -367,21 +369,33 @@ class SettingsManager(context: Context) {
         // === Priority 2: Amount + time cross-app dedup ===
         // When no txId (people write "HOC PHI CON TRAI" without HSxxx),
         // same GD arrives from push + SMS with DIFFERENT packageName/title/postTime
-        // → fingerprint won't match. But same AMOUNT within 30s = very likely same GD.
+        // → fingerprint won't match. But same AMOUNT within 5s = very likely same GD.
         //
-        // Key format: "AMT:500000" (amount only, no packageName)
-        // 30s window: push and SMS for same GD always arrive within seconds
+        // CRITICAL FIX (v2.2.4): Include SD (balance) in key when available.
+        // Without SD: "AMT:300000" → 2 different GDs with same amount within 5s → GD2 KILLED!
+        // With SD: "AMT:300000_26000000" vs "AMT:300000_26300000" → different keys → both forward!
+        // Same GD from push+SMS always has SAME SD → still dedup correctly.
+        //
+        // Key format: "AMT:amount" (no SD) or "AMT:amount_sd" (with SD)
         val amountMatch = REGEX_AMT.find(content) ?: REGEX_AMT.find(title)
         if (amountMatch != null) {
             val amountClean = amountMatch.groupValues[1].replace(REGEX_SEP, "")
             if (amountClean.length >= 4) { // Only for amounts >= 1000 to avoid false matches
-                val amtKey = "AMT:$amountClean"
+                // Extract SD balance to disambiguate different GDs with same amount
+                val sdMatch = REGEX_SD.find(content) ?: REGEX_SD.find(title)
+                val sdSuffix = if (sdMatch != null) {
+                    "_${sdMatch.groupValues[1].replace(REGEX_SEP, "")}"
+                } else {
+                    ""
+                }
+                val amtKey = "AMT:$amountClean$sdSuffix"
                 val amtExisting = dedupCache.putIfAbsent(amtKey, now)
                 if (amtExisting != null) {
                     val age = now - amtExisting
                     if (age <= 5_000L) { // 5 seconds — push and SMS always arrive within 1-2s
                         Log.w(TAG, "<<< DUPLICATE by amount+time: " +
-                                "amount=$amountClean age=${age}ms pkg=$packageName")
+                                "amount=$amountClean sd=${sdMatch?.groupValues?.getOrNull(1) ?: "N/A"} " +
+                                "age=${age}ms pkg=$packageName")
                         return true
                     } else {
                         dedupCache[amtKey] = now
@@ -394,7 +408,12 @@ class SettingsManager(context: Context) {
         // Include postTime (rounded to seconds) to distinguish 2 identical transfers
         // at different times. Without this, "NGUYEN VAN A +500,000" sent twice in 5s
         // would be deduped as false positive → LOST transaction.
-        val fingerprint = "$packageName|$title|$content|${postTime / 1000}"
+        //
+        // Include notifKey to disambiguate InboxStyle lines with truncated identical content.
+        // InboxStyle lines share same packageName, title, postTime — if content is also
+        // truncated to same text, they collide without notifKey distinction.
+        // Caller passes "snap.key:LINE:0", "snap.key:LINE:1" etc for InboxStyle lines.
+        val fingerprint = "$packageName|$notifKey|$title|$content|${postTime / 1000}"
         val existingTimestamp = dedupCache.putIfAbsent(fingerprint, now)
 
         if (existingTimestamp != null) {
