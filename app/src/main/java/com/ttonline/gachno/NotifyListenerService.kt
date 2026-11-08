@@ -321,7 +321,7 @@ class NotifyListenerService : NotificationListenerService() {
         // Enrich content for webhook: if content doesn't contain amount but title does,
         // prepend title so server can parse amount from the sent content.
         // InboxStyle lines are often truncated and lack amount → server skips → GD LOST!
-        val webhookContent = if (!content.contains(Regex("\\+\\d[\\d.,]*\\s*(?:VND|đ)"))) {
+        val webhookContent = if (REGEX_AMOUNT_PLUS.find(content) == null) {
             "$title | $content"
         } else {
             content
@@ -333,14 +333,22 @@ class NotifyListenerService : NotificationListenerService() {
         // This way, if SMS arrives 50ms later with txId="HS_073_900000",
         // its putIfAbsent will IMMEDIATELY find the alias → DUPLICATE.
         //
-        // WHY BEFORE isDuplicate:
-        // If we register AFTER, there's a 50-100ms window where SMS thread
-        // could call isDuplicate, find no alias, and forward → DUPLICATE!
+        // REVERSE CHECK: If putIfAbsent returns non-null, it means SMS thread
+        // already forwarded this HS transaction → push is DUPLICATE too!
+        // This handles the race when SMS arrives BEFORE push.
         if (transactionId != null && !transactionId.startsWith("HS_")) {
             val hsAlias = extractHsAlias(fullText)
             if (hsAlias != null) {
                 val aliasKey = "TX:$hsAlias"
-                SettingsManager.dedupCache.putIfAbsent(aliasKey, System.currentTimeMillis())
+                val existingAlias = SettingsManager.dedupCache.putIfAbsent(aliasKey, System.currentTimeMillis())
+                if (existingAlias != null) {
+                    val age = System.currentTimeMillis() - existingAlias
+                    if (age <= 5_000L) { // Within 5s = same GD from different source
+                        Log.w(TAG, "<<< SKIP reverse-alias duplicate: " +
+                                "txId=$transactionId hsAlias=$hsAlias age=${age}ms")
+                        return
+                    }
+                }
                 Log.d(TAG, ">>> Pre-registered HS alias: $hsAlias (primary: $transactionId)")
             }
         }
@@ -409,8 +417,22 @@ class NotifyListenerService : NotificationListenerService() {
             )
             .build()
 
-        WorkManager.getInstance(applicationContext).enqueue(workRequest)
-        Log.d(TAG, ">>> WorkManager enqueued for: $appName (txId=$transactionId)")
+        // Use unique work name when txId available for process-restart resilience.
+        // If app is killed and restarted, dedupCache is cleared. Android may replay
+        // notifications → same GD processed again. enqueueUniqueWork with KEEP policy
+        // ensures WorkManager won't duplicate work even after restart.
+        if (transactionId != null) {
+            val uniqueName = "TX_$transactionId"
+            WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+                uniqueName,
+                androidx.work.ExistingWorkPolicy.KEEP,
+                workRequest
+            )
+            Log.d(TAG, ">>> WorkManager enqueued UNIQUE: $uniqueName (txId=$transactionId)")
+        } else {
+            WorkManager.getInstance(applicationContext).enqueue(workRequest)
+            Log.d(TAG, ">>> WorkManager enqueued for: $appName (txId=null)")
+        }
 
         // Notify UI
         try {
