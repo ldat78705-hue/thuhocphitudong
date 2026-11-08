@@ -305,32 +305,23 @@ class SettingsManager(context: Context) {
             // If BOTH have amounts, they are DIFFERENT transactions even if same HS.
             // Real case: parent pays 800K + 600K for same HS029 → BOTH must forward.
             if (transactionId.startsWith("HS_")) {
-                val parts = transactionId.removePrefix("HS_").split("_", limit = 2)
-                val myHsNum = parts[0]           // "193"
-                val myHasAmount = parts.size > 1  // true if "HS_193_400000"
-
                 val hsEntry = dedupCache.entries.firstOrNull { entry ->
                     if (entry.key == txKey) return@firstOrNull false
                     if (!entry.key.startsWith(txPrefix)) return@firstOrNull false
                     val existingTxId = entry.key.substringAfter(txPrefix)
                     if (!existingTxId.startsWith("HS_")) return@firstOrNull false
 
-                    val existParts = existingTxId.removePrefix("HS_").split("_", limit = 2)
-                    val existHsNum = existParts[0]
-                    val existHasAmount = existParts.size > 1
-
-                    if (existHsNum != myHsNum) return@firstOrNull false
-
-                    // Case A: One side has no amount (InboxStyle vs bigText) → always match
-                    if (!myHasAmount || !existHasAmount) return@firstOrNull true
-
-                    // BOTH have amounts → NEVER match here!
-                    // Different amounts for same HS = DIFFERENT genuine GDs
-                    // (e.g. parent pays 800K + 600K for same HS029)
-                    // Cross-source dedup (push vs SMS same GD) is handled by:
-                    // 1. Step 1 EXACT match (same txId from different apps)
-                    // 2. HS alias registration (ACSP vs HS cross-type)
-                    false
+                    // PREFIX match: one txId is a prefix of the other
+                    // This handles ALL InboxStyle vs bigText scenarios:
+                    //
+                    // InboxStyle "HS_073"           PREFIX of bigText "HS_073_900000_25778420" ✅
+                    // InboxStyle "HS_073_900000"    PREFIX of bigText "HS_073_900000_25778420" ✅
+                    // bigText "HS_073_900000_25778420" PREFIX of InboxStyle "HS_073" ✅
+                    //
+                    // But NOT for different GDs (both have full SD):
+                    // Father "HS_073_300000_26000000" NOT PREFIX of Mother "HS_073_300000_26300000" ✅
+                    // Different amounts: "HS_073_800000_SD1" NOT PREFIX of "HS_073_600000_SD2" ✅
+                    existingTxId.startsWith(transactionId) || transactionId.startsWith(existingTxId)
                 }
 
                 if (hsEntry != null) {
