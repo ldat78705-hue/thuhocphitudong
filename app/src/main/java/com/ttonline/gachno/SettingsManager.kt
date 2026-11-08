@@ -67,6 +67,10 @@ class SettingsManager(context: Context) {
          * - NotificationListenerService runs in main process → same JVM → same map
          */
         internal val dedupCache = ConcurrentHashMap<String, Long>(32)
+
+        // Pre-compiled regex for Priority 2 amount dedup
+        private val REGEX_AMT = Regex("\\+(\\d[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
+        private val REGEX_SEP = Regex("[.,]")
     }
 
     private val prefs: SharedPreferences = run {
@@ -352,10 +356,9 @@ class SettingsManager(context: Context) {
         //
         // Key format: "AMT:500000" (amount only, no packageName)
         // 30s window: push and SMS for same GD always arrive within seconds
-        val amountRegex = Regex("\\+(\\d[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
-        val amountMatch = amountRegex.find(content) ?: amountRegex.find(title)
+        val amountMatch = REGEX_AMT.find(content) ?: REGEX_AMT.find(title)
         if (amountMatch != null) {
-            val amountClean = amountMatch.groupValues[1].replace(Regex("[.,]"), "")
+            val amountClean = amountMatch.groupValues[1].replace(REGEX_SEP, "")
             if (amountClean.length >= 4) { // Only for amounts >= 1000 to avoid false matches
                 val amtKey = "AMT:$amountClean"
                 val amtExisting = dedupCache.putIfAbsent(amtKey, now)

@@ -74,6 +74,8 @@ class NotifyListenerService : NotificationListenerService() {
         private val REGEX_AMOUNT_RAW = Regex("\\+(\\d[\\d.,]{2,})")  // +400,000 without VND
         // Balance (SD) extraction - disambiguate same HS + same amount from different GDs
         private val REGEX_SD = Regex("SD[:\\s]*(\\d[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
+        // Separator cleanup - used to strip commas/dots from amounts
+        private val REGEX_SEPARATOR = Regex("[.,]")
     }
 
     /**
@@ -501,7 +503,7 @@ class NotifyListenerService : NotificationListenerService() {
             val amountMatch = REGEX_AMOUNT_PLUS.find(text)
                 ?: REGEX_AMOUNT_ANY.find(text)
                 ?: REGEX_AMOUNT_RAW.find(text)
-            val amount = amountMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
+            val amount = amountMatch?.groupValues?.get(1)?.replace(REGEX_SEPARATOR, "") ?: ""
             // Extract balance (SD) to disambiguate same HS + same amount
             // CRITICAL: Father pays 300K for HS193 → SD=26,000,000
             //           Mother pays 300K for HS193 → SD=26,300,000
@@ -509,7 +511,7 @@ class NotifyListenerService : NotificationListenerService() {
             // With SD: "HS_193_300000_26000000" ≠ "HS_193_300000_26300000" → BOTH forward!
             // Same GD push+SMS: both have SAME SD → SAME txId → DUPLICATE → correct!
             val sdMatch = REGEX_SD.find(text)
-            val sd = sdMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
+            val sd = sdMatch?.groupValues?.get(1)?.replace(REGEX_SEPARATOR, "") ?: ""
             return when {
                 amount.isNotEmpty() && sd.isNotEmpty() -> "HS_${hsCode}_${amount}_$sd"
                 amount.isNotEmpty() -> "HS_${hsCode}_$amount"
@@ -535,9 +537,9 @@ class NotifyListenerService : NotificationListenerService() {
         val amountMatch = REGEX_AMOUNT_PLUS.find(text)
             ?: REGEX_AMOUNT_ANY.find(text)
             ?: REGEX_AMOUNT_RAW.find(text)
-        val amount = amountMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
+        val amount = amountMatch?.groupValues?.get(1)?.replace(REGEX_SEPARATOR, "") ?: ""
         val sdMatch = REGEX_SD.find(text)
-        val sd = sdMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
+        val sd = sdMatch?.groupValues?.get(1)?.replace(REGEX_SEPARATOR, "") ?: ""
         return when {
             amount.isNotEmpty() && sd.isNotEmpty() -> "HS_${hsCode}_${amount}_$sd"
             amount.isNotEmpty() -> "HS_${hsCode}_$amount"
