@@ -357,7 +357,34 @@ class SettingsManager(context: Context) {
             return false
         }
 
-        // === Priority 2: Full string fingerprint (fallback) ===
+        // === Priority 2: Amount + time cross-app dedup ===
+        // When no txId (people write "HOC PHI CON TRAI" without HSxxx),
+        // same GD arrives from push + SMS with DIFFERENT packageName/title/postTime
+        // → fingerprint won't match. But same AMOUNT within 30s = very likely same GD.
+        //
+        // Key format: "AMT:500000" (amount only, no packageName)
+        // 30s window: push and SMS for same GD always arrive within seconds
+        val amountRegex = Regex("\\+(\\d[\\d.,]*)\\s*(?:VND|đ|dong)", RegexOption.IGNORE_CASE)
+        val amountMatch = amountRegex.find(content) ?: amountRegex.find(title)
+        if (amountMatch != null) {
+            val amountClean = amountMatch.groupValues[1].replace(Regex("[.,]"), "")
+            if (amountClean.length >= 4) { // Only for amounts >= 1000 to avoid false matches
+                val amtKey = "AMT:$amountClean"
+                val amtExisting = dedupCache.putIfAbsent(amtKey, now)
+                if (amtExisting != null) {
+                    val age = now - amtExisting
+                    if (age <= 5_000L) { // 5 seconds — push and SMS always arrive within 1-2s
+                        Log.w(TAG, "<<< DUPLICATE by amount+time: " +
+                                "amount=$amountClean age=${age}ms pkg=$packageName")
+                        return true
+                    } else {
+                        dedupCache[amtKey] = now
+                    }
+                }
+            }
+        }
+
+        // === Priority 3: Full string fingerprint (last resort) ===
         // Include postTime (rounded to seconds) to distinguish 2 identical transfers
         // at different times. Without this, "NGUYEN VAN A +500,000" sent twice in 5s
         // would be deduped as false positive → LOST transaction.

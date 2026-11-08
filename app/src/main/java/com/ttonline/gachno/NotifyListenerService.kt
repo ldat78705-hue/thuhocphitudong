@@ -421,31 +421,32 @@ class NotifyListenerService : NotificationListenerService() {
      * fingerprint matching which can produce false positives when InboxStyle
      * truncates two lines to identical prefixes.
      *
-     * Supported patterns (checked in order):
-     * 1. FT + digits     — MB Bank, Techcombank, ACB
-     * 2. ACSP/ + code    — MB Bank alternate
-     * 3. Ma GD + code    — VCB, Sacombank, TPBank
-     * 4. VPBFT + digits  — VPBank
+     * Supported patterns (checked in order — most specific first):
+     * 1. VPBFT + digits  — VPBank (MUST before FT to avoid losing VPB prefix)
+     * 2. FT + digits     — MB Bank, Techcombank, ACB
+     * 3. ACSP/ + code    — MB Bank alternate
+     * 4. Ma GD + code    — VCB, Sacombank, TPBank, Agribank
      * 5. GD: + digits    — BIDV
-     * 6. HS + digits     — HOC PHI (gạch nợ hệ thống) ← NEW v2.1.5
+     * 6. HS + digits     — HOC PHI (gạch nợ hệ thống)
      */
     private fun extractTransactionId(text: String): String? {
-        // Pattern 1: FT + digits (MB Bank, Techcombank)
+        // Pattern 1: VPBFT + digits (VPBank) — MUST check BEFORE generic FT!
+        // "VPBFT12345678901" → if FT checked first, it matches "FT12345678901" and loses "VPB" prefix
+        val vpbMatch = REGEX_VPBFT.find(text)
+        if (vpbMatch != null) return "VPBFT${vpbMatch.groupValues[1]}"
+
+        // Pattern 2: FT + digits (MB Bank, Techcombank, ACB)
         val ftMatch = REGEX_FT.find(text)
         if (ftMatch != null) return ftMatch.value
 
-        // Pattern 2: "ACSP/" followed by code (MB Bank format: "Ma GD ACSP/ V1083643")
+        // Pattern 3: "ACSP/" followed by code (MB Bank format: "Ma GD ACSP/ V1083643")
         // MUST check BEFORE "Ma GD" pattern — otherwise "Ma GD" captures "ACSP" as the code
         val acspMatch = REGEX_ACSP.find(text)
         if (acspMatch != null) return "ACSP_${acspMatch.groupValues[1]}"
 
-        // Pattern 3: "Ma GD" or "MGD" followed by alphanumeric code (non-ACSP)
+        // Pattern 4: "Ma GD" or "MGD" followed by alphanumeric code (non-ACSP)
         val mgdMatch = REGEX_MGD.find(text)
         if (mgdMatch != null) return mgdMatch.groupValues[1]
-
-        // Pattern 4: VPBank "VPBFT12345678" — VPB prefix before FT
-        val vpbMatch = REGEX_VPBFT.find(text)
-        if (vpbMatch != null) return "VPBFT${vpbMatch.groupValues[1]}"
 
         // Pattern 5: BIDV "GD: 12345678" or "So GD: 12345678"
         val gdMatch = REGEX_GD.find(text)
