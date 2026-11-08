@@ -92,13 +92,19 @@ class SendWorker(
             settings.updateLog(logId, LogEntry.Status.FAILED, result.responseCode, result.errorMessage)
             Log.e(TAG, "Webhook failed: ${result.errorMessage}")
 
-            // Retry if possible
-            return if (runAttemptCount < maxRetries) {
+            // Always retry on failure — NEVER permanently lose a transaction!
+            // WorkManager's CONNECTED constraint ensures we only retry when network is available.
+            // With EXPONENTIAL backoff (30s, 60s, 120s, 240s, 480s, 960s, 1920s, 3840s, 7680s...),
+            // even if network is unstable, we'll keep trying for hours.
+            // maxRetries is just for LOG status — WorkManager always retries.
+            if (runAttemptCount < maxRetries) {
                 Log.d(TAG, "Will retry (attempt ${runAttemptCount + 1}/$maxRetries)")
-                Result.retry()
             } else {
-                Result.failure()
+                // Beyond maxRetries: update log to FAILED but STILL retry
+                // User sees FAILED status but system keeps trying in background
+                Log.w(TAG, "Beyond maxRetries ($maxRetries), still retrying (attempt ${runAttemptCount + 1})")
             }
+            return Result.retry()
         }
     }
 }

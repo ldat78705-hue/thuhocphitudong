@@ -318,24 +318,29 @@ class NotifyListenerService : NotificationListenerService() {
             Log.d(TAG, ">>> TransactionId extracted: $transactionId")
         }
 
-        // Duplicate check - uses transactionId when available, falls back to full string
-        if (settings.isDuplicate(packageName, title, content, snap.key, snap.postTime, transactionId)) {
-            Log.w(TAG, "<<< SKIP duplicate: pkg=$packageName " +
-                    "txId=$transactionId content='${content.take(100)}...'")
-            return
-        }
-
-        // === Register HS alias for cross-type dedup ===
+        // === Register HS alias BEFORE dedup check (race condition prevention) ===
         // When txId is ACSP/FT/MGD but content also has HS code,
-        // register the HS+amount key as alias in dedupCache.
-        // This prevents: push="ACSP_LX086639" + SMS="HS_073_900000" → both forward.
+        // register HS+amount alias IMMEDIATELY in dedupCache.
+        // This way, if SMS arrives 50ms later with txId="HS_073_900000",
+        // its putIfAbsent will IMMEDIATELY find the alias → DUPLICATE.
+        //
+        // WHY BEFORE isDuplicate:
+        // If we register AFTER, there's a 50-100ms window where SMS thread
+        // could call isDuplicate, find no alias, and forward → DUPLICATE!
         if (transactionId != null && !transactionId.startsWith("HS_")) {
             val hsAlias = extractHsAlias(fullText)
             if (hsAlias != null) {
                 val aliasKey = "TX:$hsAlias"
                 SettingsManager.dedupCache.putIfAbsent(aliasKey, System.currentTimeMillis())
-                Log.d(TAG, ">>> Registered HS alias: $hsAlias (primary: $transactionId)")
+                Log.d(TAG, ">>> Pre-registered HS alias: $hsAlias (primary: $transactionId)")
             }
+        }
+
+        // Duplicate check - uses transactionId when available, falls back to full string
+        if (settings.isDuplicate(packageName, title, content, snap.key, snap.postTime, transactionId)) {
+            Log.w(TAG, "<<< SKIP duplicate: pkg=$packageName " +
+                    "txId=$transactionId content='${content.take(100)}...'")
+            return
         }
 
         // Get app name
@@ -389,8 +394,8 @@ class NotifyListenerService : NotificationListenerService() {
                 )
             )
             .setBackoffCriteria(
-                BackoffPolicy.LINEAR,
-                15,
+                BackoffPolicy.EXPONENTIAL,
+                30,
                 TimeUnit.SECONDS
             )
             .build()
