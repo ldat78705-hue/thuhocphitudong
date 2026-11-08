@@ -333,8 +333,13 @@ class NotifyListenerService : NotificationListenerService() {
 
         // Enrich content for webhook: if content doesn't contain amount but title does,
         // prepend title so server can parse amount from the sent content.
-        // InboxStyle lines are often truncated and lack amount → server skips → GD LOST!
-        val webhookContent = if (REGEX_AMOUNT_PLUS.find(content) == null) {
+        //
+        // EXCEPTION: InboxStyle lines must NOT prepend title because:
+        //   - Title "+900,000 VND" is the amount of the LAST transaction (e.g. HS073)
+        //   - Other lines (e.g. HS099 +300K) would get WRONG amount from title
+        //   - Better to send no amount than wrong amount
+        //   - SMS with correct amount will also forward (not PREFIX-blocked by code-only entry)
+        val webhookContent = if (!isInboxStyleLine && REGEX_AMOUNT_PLUS.find(content) == null) {
             "$title | $content"
         } else {
             content
