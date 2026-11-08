@@ -329,11 +329,13 @@ class SettingsManager(context: Context) {
                     // Case A: One side has no amount (InboxStyle vs bigText) → always match
                     if (!myHasAmount || !existHasAmount) return@firstOrNull true
 
-                    // Case B: Both have amounts but DIFFERENT amounts → match ONLY within 60s
+                    // Case B: Both have amounts but DIFFERENT amounts → match ONLY within 3s
                     // This handles push (+900,000 total) vs SMS (+500,000 HP only)
-                    // But allows father (200K at 10:00) + mother (300K at 10:30) to BOTH forward
+                    // Push and SMS for same GD ALWAYS arrive within 1-2 seconds.
+                    // 3s is tight enough that father (200K) + mother (300K) even 10s apart
+                    // will BOTH forward correctly.
                     val age = now - entry.value
-                    age <= 60_000L  // 60 seconds threshold for cross-source dedup
+                    age <= 3_000L  // 3 seconds — push+SMS always within 1-2s
                 }
 
                 if (hsEntry != null) {
