@@ -109,15 +109,23 @@ jobs:
         body: |
           ## GachNo v${{ steps.version.outputs.version }}
 
-          ### 🔧 Sửa lỗi quan trọng:
-          - ✅ Không block binder thread — xử lý async, 10 GD cùng lúc không sót
-          - ✅ Snapshot notification ngay lập tức — chống mất dữ liệu khi bank update notif
-          - ✅ Extract mã HS + số tiền cho dedup chính xác (HS_193_400000)
-          - ✅ Atomic dedup (putIfAbsent) — không race condition giữa 2 thread
-          - ✅ FT-only prefix match — tránh dedup nhầm HS193/HS184
-          - ✅ Ưu tiên +amount — không match nhầm số dư SD
-          - ✅ Retry webhook 3 lần, backoff 15s
-          - ✅ WakeLock đúng thời điểm
+          ### 🔧 Sửa lỗi quan trọng v2.2.1:
+          - ✅ SD-based dedup: Phân biệt 2 GD cùng HS + cùng số tiền nhờ số dư TK
+          - ✅ Bỏ Case B dedup: PHHS đóng nhiều lần cho cùng con → KHÔNG bị mất GD
+          - ✅ InboxStyle enrichment: Gửi đầy đủ title + content → server luôn parse được
+          - ✅ Reverse-alias race fix: SMS đến trước push vẫn dedup đúng
+          - ✅ WorkManager UniqueWork: Chống trùng sau restart app
+          - ✅ Bỏ packageName khỏi txKey → push + SMS cùng GD luôn dedup chính xác
+
+          ### 🏦 Hỗ trợ đa ngân hàng:
+          - MB Bank (ACSP, FT), VPBank (VPBFT), VCB (MGD), BIDV (So GD)
+          - TPBank, Sacombank, Agribank, ACB, Techcombank
+
+          ### 💪 Độ tin cậy:
+          - ✅ Retry không giới hạn (WorkManager exponential backoff 30s)
+          - ✅ Hoạt động offline → tự gửi khi có mạng
+          - ✅ WakeLock chống CPU sleep
+          - ✅ Snapshot notification ngay lập tức
 
           ### 📱 Cài đặt:
           1. Tải file APK bên dưới
