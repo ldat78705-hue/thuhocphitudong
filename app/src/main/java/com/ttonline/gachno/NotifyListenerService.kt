@@ -325,6 +325,19 @@ class NotifyListenerService : NotificationListenerService() {
             return
         }
 
+        // === Register HS alias for cross-type dedup ===
+        // When txId is ACSP/FT/MGD but content also has HS code,
+        // register the HS+amount key as alias in dedupCache.
+        // This prevents: push="ACSP_LX086639" + SMS="HS_073_900000" → both forward.
+        if (transactionId != null && !transactionId.startsWith("HS_")) {
+            val hsAlias = extractHsAlias(fullText)
+            if (hsAlias != null) {
+                val aliasKey = "TX:$hsAlias"
+                SettingsManager.dedupCache.putIfAbsent(aliasKey, System.currentTimeMillis())
+                Log.d(TAG, ">>> Registered HS alias: $hsAlias (primary: $transactionId)")
+            }
+        }
+
         // Get app name
         val appName = try {
             val appInfo = packageManager.getApplicationInfo(packageName, 0)
@@ -459,6 +472,25 @@ class NotifyListenerService : NotificationListenerService() {
         }
 
         return null
+    }
+
+    /**
+     * Extract HS+amount alias from text, even when primary txId is ACSP/FT/MGD.
+     * Used to register alias in dedupCache so that SMS with only HS code
+     * (no ACSP/FT) will be deduped against push that had ACSP/FT.
+     *
+     * Example: content "...HS073- Ma GD ACSP/ LX086639 +900,000VND"
+     *   → primary txId = "ACSP_LX086639" (from extractTransactionId)
+     *   → HS alias = "HS_073_900000" (from this function)
+     */
+    private fun extractHsAlias(text: String): String? {
+        val hsMatch = REGEX_HS.find(text) ?: return null
+        val hsCode = hsMatch.groupValues[1]
+        val amountMatch = REGEX_AMOUNT_PLUS.find(text)
+            ?: REGEX_AMOUNT_ANY.find(text)
+            ?: REGEX_AMOUNT_RAW.find(text)
+        val amount = amountMatch?.groupValues?.get(1)?.replace(Regex("[.,]"), "") ?: ""
+        return if (amount.isNotEmpty()) "HS_${hsCode}_$amount" else "HS_$hsCode"
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {

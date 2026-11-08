@@ -66,7 +66,7 @@ class SettingsManager(context: Context) {
          * - Lives in companion object → shared across all SettingsManager instances in same process
          * - NotificationListenerService runs in main process → same JVM → same map
          */
-        private val dedupCache = ConcurrentHashMap<String, Long>(32)
+        internal val dedupCache = ConcurrentHashMap<String, Long>(32)
     }
 
     private val prefs: SharedPreferences = run {
