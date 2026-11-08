@@ -48,6 +48,14 @@ class BootReceiver : BroadcastReceiver() {
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to schedule KeepAliveWorker: ${e.message}", e)
                 }
+
+                // Schedule watchdog alarm (5-min exact alarm)
+                try {
+                    ServiceWatchdog.schedule(context)
+                    Log.d(TAG, "ServiceWatchdog scheduled")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to schedule ServiceWatchdog: ${e.message}", e)
+                }
             }
         }
     }

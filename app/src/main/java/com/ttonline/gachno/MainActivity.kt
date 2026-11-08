@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         if (settings.isForwardingEnabled) {
             ForegroundService.start(this)
             KeepAliveWorker.schedule(this)
+            ServiceWatchdog.schedule(this)
         }
 
         // Auto-setup wizard on first launch
@@ -232,9 +233,11 @@ class MainActivity : AppCompatActivity() {
         if (isChecked) {
             ForegroundService.start(this)
             KeepAliveWorker.schedule(this)
+            ServiceWatchdog.schedule(this)
         } else {
             ForegroundService.stop(this)
             KeepAliveWorker.cancel(this)
+            ServiceWatchdog.cancel(this)
         }
         updateServiceStatus()
         // Prevent auto-scroll

@@ -117,6 +117,77 @@ class NotifyListenerService : NotificationListenerService() {
         super.onListenerConnected()
         isRunning = true
         Log.d(TAG, "=== Listener CONNECTED ===")
+
+        // SAFETY NET: Scan active notifications that may have arrived while disconnected.
+        // When Android kills and restarts the listener, any notifications posted during
+        // the dead period are still visible in the notification shade.
+        // getActiveNotifications() returns them → we process each → isDuplicate filters
+        // already-forwarded ones → only NEW ones get forwarded.
+        Thread {
+            try {
+                Thread.sleep(2000) // Wait for system to stabilize after reconnect
+                scanActiveNotifications()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error scanning active notifications: ${e.message}", e)
+            }
+        }.start()
+    }
+
+    /**
+     * Scan all active notifications from selected apps.
+     * Creates snapshots and processes each one.
+     * isDuplicate() ensures already-forwarded notifications are skipped.
+     *
+     * Called on:
+     * 1. onListenerConnected — catches notifications posted during disconnection
+     * 2. Periodic health check — catches notifications that slipped through
+     */
+    private fun scanActiveNotifications() {
+        try {
+            val activeNotifs = getActiveNotifications() ?: return
+            val selectedApps = settings.getSelectedApps()
+
+            var scanned = 0
+            for (sbn in activeNotifs) {
+                val pkg = sbn.packageName ?: continue
+                // Skip self and system
+                if (pkg == packageName) continue
+                if (pkg == "android" || pkg == "com.android.systemui") continue
+                // Check app filter
+                if (selectedApps.isNotEmpty() && !selectedApps.contains(pkg)) continue
+
+                scanned++
+                // Create snapshot and process — isDuplicate will skip already-forwarded ones
+                val notification = sbn.notification ?: continue
+                val extras = notification.extras ?: continue
+
+                val snapshot = NotifSnapshot(
+                    packageName = pkg,
+                    key = sbn.key ?: "",
+                    id = sbn.id,
+                    tag = sbn.tag,
+                    postTime = sbn.postTime,
+                    title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: "",
+                    text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: "",
+                    bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: "",
+                    textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+                        ?.mapNotNull { it?.toString() }
+                        ?.filter { it.isNotEmpty() }
+                        ?: emptyList(),
+                    tickerText = notification.tickerText?.toString(),
+                    flags = notification.flags
+                )
+
+                Log.d(TAG, ">>> SCAN active: $pkg key=${snapshot.key} " +
+                        "title='${snapshot.title.take(40)}' text='${snapshot.text.take(40)}'")
+                processSnapshot(snapshot)
+            }
+            Log.d(TAG, "=== Scanned $scanned active notifications from selected apps ===")
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Cannot access active notifications: ${e.message}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in scanActiveNotifications: ${e.message}", e)
+        }
     }
 
     /**
@@ -461,22 +532,30 @@ class NotifyListenerService : NotificationListenerService() {
             )
             .build()
 
-        // Use unique work name when txId available for process-restart resilience.
+        // === ALWAYS use enqueueUniqueWork for process-restart resilience ===
         // If app is killed and restarted, dedupCache is cleared. Android may replay
         // notifications → same GD processed again. enqueueUniqueWork with KEEP policy
         // ensures WorkManager won't duplicate work even after restart.
-        if (transactionId != null) {
-            val uniqueName = "TX_$transactionId"
-            WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-                uniqueName,
-                androidx.work.ExistingWorkPolicy.KEEP,
-                workRequest
-            )
-            Log.d(TAG, ">>> WorkManager enqueued UNIQUE: $uniqueName (txId=$transactionId)")
+        //
+        // CRITICAL FIX (v2.2.5 Bug 15): When txId is null, previous code used
+        // WorkManager.enqueue() with RANDOM work name → after restart, scanActiveNotifications
+        // finds same notification, isDuplicate returns false (cache cleared), creates NEW work
+        // with different random name → DUPLICATE GD on webhook!
+        //
+        // FIX: Always create deterministic unique name:
+        // - txId available: "TX_ACSP_V1083643" (precise, cross-app)
+        // - txId null: "FP_{pkg}_{postTime}_{contentHash}" (fingerprint-based)
+        val uniqueName = if (transactionId != null) {
+            "TX_$transactionId"
         } else {
-            WorkManager.getInstance(applicationContext).enqueue(workRequest)
-            Log.d(TAG, ">>> WorkManager enqueued for: $appName (txId=null)")
+            "FP_${packageName}_${snap.postTime}_${content.hashCode()}"
         }
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            uniqueName,
+            androidx.work.ExistingWorkPolicy.KEEP,
+            workRequest
+        )
+        Log.d(TAG, ">>> WorkManager enqueued UNIQUE: $uniqueName (txId=$transactionId)")
 
         // Notify UI
         try {

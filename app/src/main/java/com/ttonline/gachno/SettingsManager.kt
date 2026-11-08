@@ -376,29 +376,38 @@ class SettingsManager(context: Context) {
         // With SD: "AMT:300000_26000000" vs "AMT:300000_26300000" → different keys → both forward!
         // Same GD from push+SMS always has SAME SD → still dedup correctly.
         //
+        // CRITICAL FIX (v2.2.5): SKIP Priority 2 for InboxStyle lines.
+        // InboxStyle lines from same notification share title (which has amount).
+        // If lines are truncated (no SD, no HS) → AMT key collides → GD2 KILLED!
+        // InboxStyle lines already have unique fingerprints via line index (Priority 3).
+        // Priority 2 is ONLY needed for cross-app dedup (push vs SMS = different packageName).
+        //
         // Key format: "AMT:amount" (no SD) or "AMT:amount_sd" (with SD)
-        val amountMatch = REGEX_AMT.find(content) ?: REGEX_AMT.find(title)
-        if (amountMatch != null) {
-            val amountClean = amountMatch.groupValues[1].replace(REGEX_SEP, "")
-            if (amountClean.length >= 4) { // Only for amounts >= 1000 to avoid false matches
-                // Extract SD balance to disambiguate different GDs with same amount
-                val sdMatch = REGEX_SD.find(content) ?: REGEX_SD.find(title)
-                val sdSuffix = if (sdMatch != null) {
-                    "_${sdMatch.groupValues[1].replace(REGEX_SEP, "")}"
-                } else {
-                    ""
-                }
-                val amtKey = "AMT:$amountClean$sdSuffix"
-                val amtExisting = dedupCache.putIfAbsent(amtKey, now)
-                if (amtExisting != null) {
-                    val age = now - amtExisting
-                    if (age <= 5_000L) { // 5 seconds — push and SMS always arrive within 1-2s
-                        Log.w(TAG, "<<< DUPLICATE by amount+time: " +
-                                "amount=$amountClean sd=${sdMatch?.groupValues?.getOrNull(1) ?: "N/A"} " +
-                                "age=${age}ms pkg=$packageName")
-                        return true
+        val isInboxLine = notifKey.contains(":LINE:")
+        if (!isInboxLine) {
+            val amountMatch = REGEX_AMT.find(content) ?: REGEX_AMT.find(title)
+            if (amountMatch != null) {
+                val amountClean = amountMatch.groupValues[1].replace(REGEX_SEP, "")
+                if (amountClean.length >= 4) { // Only for amounts >= 1000 to avoid false matches
+                    // Extract SD balance to disambiguate different GDs with same amount
+                    val sdMatch = REGEX_SD.find(content) ?: REGEX_SD.find(title)
+                    val sdSuffix = if (sdMatch != null) {
+                        "_${sdMatch.groupValues[1].replace(REGEX_SEP, "")}"
                     } else {
-                        dedupCache[amtKey] = now
+                        ""
+                    }
+                    val amtKey = "AMT:$amountClean$sdSuffix"
+                    val amtExisting = dedupCache.putIfAbsent(amtKey, now)
+                    if (amtExisting != null) {
+                        val age = now - amtExisting
+                        if (age <= 5_000L) { // 5 seconds — push and SMS always arrive within 1-2s
+                            Log.w(TAG, "<<< DUPLICATE by amount+time: " +
+                                    "amount=$amountClean sd=${sdMatch?.groupValues?.getOrNull(1) ?: "N/A"} " +
+                                    "age=${age}ms pkg=$packageName")
+                            return true
+                        } else {
+                            dedupCache[amtKey] = now
+                        }
                     }
                 }
             }
@@ -489,4 +498,18 @@ class SettingsManager(context: Context) {
     fun clearLogs() = synchronized(logLock) {
         prefs.edit().putString(KEY_LOGS, "[]").apply()
     }
+
+    // === Watchdog health status ===
+    fun saveWatchdogStatus(listenerAlive: Boolean) {
+        prefs.edit()
+            .putLong("watchdog_last_check", System.currentTimeMillis())
+            .putBoolean("watchdog_listener_alive", listenerAlive)
+            .apply()
+    }
+
+    val watchdogLastCheck: Long
+        get() = prefs.getLong("watchdog_last_check", 0)
+
+    val watchdogListenerAlive: Boolean
+        get() = prefs.getBoolean("watchdog_listener_alive", false)
 }

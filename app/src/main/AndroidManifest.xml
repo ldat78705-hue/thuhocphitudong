@@ -12,6 +12,9 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
         tools:ignore="ProtectedPermissions" />
 
@@ -88,6 +91,12 @@
                 <action android:name="com.asus.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- ServiceWatchdog: AlarmManager exact alarm every 5 min to check listener health -->
+        <receiver
+            android:name=".ServiceWatchdog"
+            android:enabled="true"
+            android:exported="false" />
 
     </application>
 

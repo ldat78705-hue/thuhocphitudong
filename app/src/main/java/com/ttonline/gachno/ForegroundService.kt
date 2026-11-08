@@ -96,6 +96,9 @@ class ForegroundService : Service() {
             }, 3000)
         }
 
+        // Schedule watchdog alarm (5-min exact alarm, more reliable than 15-min WorkManager)
+        ServiceWatchdog.schedule(this)
+
         return START_STICKY
     }
 
@@ -117,6 +120,7 @@ class ForegroundService : Service() {
         Log.d(TAG, "Task removed (user swiped) - scheduling restart")
         try {
             KeepAliveWorker.schedule(applicationContext)
+            ServiceWatchdog.schedule(applicationContext)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule restart: ${e.message}")
         }
