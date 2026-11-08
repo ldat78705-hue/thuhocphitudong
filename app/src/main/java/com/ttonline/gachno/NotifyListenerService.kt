@@ -272,8 +272,6 @@ class NotifyListenerService : NotificationListenerService() {
             }
             // ALSO forward the main text/bigText — isDuplicate() will naturally skip it
             // if it matches any InboxStyle line already forwarded above.
-            // This is safer than heuristic startsWith(take(20)) which could false-positive
-            // skip a genuine new transaction when names overlap.
             if (text.isNotEmpty()) {
                 forwardFromSnapshot(snap, packageName, snap.title, text, webhookUrl)
             }
@@ -318,6 +316,15 @@ class NotifyListenerService : NotificationListenerService() {
             Log.d(TAG, ">>> TransactionId extracted: $transactionId")
         }
 
+        // Enrich content for webhook: if content doesn't contain amount but title does,
+        // prepend title so server can parse amount from the sent content.
+        // InboxStyle lines are often truncated and lack amount → server skips → GD LOST!
+        val webhookContent = if (!content.contains(Regex("\\+\\d[\\d.,]*\\s*(?:VND|đ)"))) {
+            "$title | $content"
+        } else {
+            content
+        }
+
         // === Register HS alias BEFORE dedup check (race condition prevention) ===
         // When txId is ACSP/FT/MGD but content also has HS code,
         // register HS+amount alias IMMEDIATELY in dedupCache.
@@ -351,14 +358,14 @@ class NotifyListenerService : NotificationListenerService() {
             packageName
         }
 
-        Log.d(TAG, ">>> FORWARDING: $appName [$packageName]: $title - ${content.take(100)}")
+        Log.d(TAG, ">>> FORWARDING: $appName [$packageName]: $title - ${webhookContent.take(100)}")
 
         // Save log
         val logEntry = LogEntry(
             appName = appName,
             packageName = packageName,
             title = title,
-            content = content
+            content = webhookContent
         )
         settings.addLog(logEntry)
 
@@ -371,7 +378,7 @@ class NotifyListenerService : NotificationListenerService() {
             .build()
 
         // Truncate content to prevent exceeding WorkManager 10KB data limit
-        val safeContent = if (content.length > 4000) content.take(4000) else content
+        val safeContent = if (webhookContent.length > 4000) webhookContent.take(4000) else webhookContent
         val safeTemplate = settings.webhookParams.let {
             if (it.length > 2000) it.take(2000) else it
         }

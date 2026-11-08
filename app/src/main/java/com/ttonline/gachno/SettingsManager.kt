@@ -301,14 +301,9 @@ class SettingsManager(context: Context) {
             // InboxStyle line: "CUSTOMER HOC PHI HS193..." → txId "HS_193" (no amount)
             // bigText (already forwarded): "...+400,000 VND...HS193" → txId "HS_193_400000"
             //
-            // IMPORTANT: Only match when ONE side has amount and the OTHER doesn't.
-            // If BOTH have amounts (HS_193_200000 vs HS_193_300000), they are DIFFERENT
-            // transactions (father 200K + mother 300K) → must BOTH forward.
-            //
-            // EXCEPTION (Step 3b): Same HS, BOTH have amount, different amounts,
-            // AND within 60s → likely SAME GD from different sources (push vs SMS).
-            // Push may show total transfer amount, SMS may show HP amount only.
-            // Within 60s is too fast for 2 genuine separate payments to same student.
+            // ONLY match when ONE side has no amount (InboxStyle truncation).
+            // If BOTH have amounts, they are DIFFERENT transactions even if same HS.
+            // Real case: parent pays 800K + 600K for same HS029 → BOTH must forward.
             if (transactionId.startsWith("HS_")) {
                 val parts = transactionId.removePrefix("HS_").split("_", limit = 2)
                 val myHsNum = parts[0]           // "193"
@@ -329,13 +324,13 @@ class SettingsManager(context: Context) {
                     // Case A: One side has no amount (InboxStyle vs bigText) → always match
                     if (!myHasAmount || !existHasAmount) return@firstOrNull true
 
-                    // Case B: Both have amounts but DIFFERENT amounts → match ONLY within 3s
-                    // This handles push (+900,000 total) vs SMS (+500,000 HP only)
-                    // Push and SMS for same GD ALWAYS arrive within 1-2 seconds.
-                    // 3s is tight enough that father (200K) + mother (300K) even 10s apart
-                    // will BOTH forward correctly.
-                    val age = now - entry.value
-                    age <= 3_000L  // 3 seconds — push+SMS always within 1-2s
+                    // BOTH have amounts → NEVER match here!
+                    // Different amounts for same HS = DIFFERENT genuine GDs
+                    // (e.g. parent pays 800K + 600K for same HS029)
+                    // Cross-source dedup (push vs SMS same GD) is handled by:
+                    // 1. Step 1 EXACT match (same txId from different apps)
+                    // 2. HS alias registration (ACSP vs HS cross-type)
+                    false
                 }
 
                 if (hsEntry != null) {
