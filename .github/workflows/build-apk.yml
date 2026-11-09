@@ -109,23 +109,28 @@ jobs:
         body: |
           ## GachNo v${{ steps.version.outputs.version }}
 
-          ### 🔧 Sửa lỗi quan trọng v2.2.1:
-          - ✅ SD-based dedup: Phân biệt 2 GD cùng HS + cùng số tiền nhờ số dư TK
-          - ✅ Bỏ Case B dedup: PHHS đóng nhiều lần cho cùng con → KHÔNG bị mất GD
-          - ✅ InboxStyle enrichment: Gửi đầy đủ title + content → server luôn parse được
-          - ✅ Reverse-alias race fix: SMS đến trước push vẫn dedup đúng
-          - ✅ WorkManager UniqueWork: Chống trùng sau restart app
-          - ✅ Bỏ packageName khỏi txKey → push + SMS cùng GD luôn dedup chính xác
+          ### 🛡️ Pipeline 9 lớp bảo vệ — Không sót, Không trùng:
+          1. Snapshot immutable trên binder thread
+          2. Async processing (không block binder pool)
+          3. WakeLock 30s chống CPU sleep
+          4. P1: txId dedup (ACSP/FT/HS+amount+SD, 24h TTL)
+          5. P2: Amount+SD cross-app dedup (skip InboxStyle)
+          6. P3: Fingerprint + line index dedup
+          7. UniqueWork KEEP (deterministic, chống trùng sau restart)
+          8. scanActiveNotifications khi reconnect (bắt GD bị sót)
+          9. ServiceWatchdog 5-phút alarm (phục hồi nhanh)
+
+          ### 🔧 15 bugs đã fix (v2.2.0 → v2.3.0):
+          - ✅ SD-based dedup: Phân biệt 2 GD cùng HS + cùng số tiền
+          - ✅ InboxStyle: Xử lý đúng khi MB Bank gom nhiều GD
+          - ✅ Reverse-alias: SMS đến trước push vẫn dedup chính xác
+          - ✅ UniqueWork always: Chống trùng kể cả khi txId=null
+          - ✅ scanActiveNotifications: Quét shade khi service khôi phục
+          - ✅ ServiceWatchdog: AlarmManager 5 phút kiểm tra + tự sửa
 
           ### 🏦 Hỗ trợ đa ngân hàng:
           - MB Bank (ACSP, FT), VPBank (VPBFT), VCB (MGD), BIDV (So GD)
           - TPBank, Sacombank, Agribank, ACB, Techcombank
-
-          ### 💪 Độ tin cậy:
-          - ✅ Retry không giới hạn (WorkManager exponential backoff 30s)
-          - ✅ Hoạt động offline → tự gửi khi có mạng
-          - ✅ WakeLock chống CPU sleep
-          - ✅ Snapshot notification ngay lập tức
 
           ### 📱 Cài đặt:
           1. Tải file APK bên dưới

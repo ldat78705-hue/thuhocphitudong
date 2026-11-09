@@ -176,7 +176,7 @@ class WebhookSender {
                 val requestBuilder = Request.Builder()
                     .url(webhookUrl)
                     .post(requestBody)
-                    .addHeader("User-Agent", "GachNo/2.1")
+                    .addHeader("User-Agent", "GachNo/2.3")
 
                 // Add custom headers (skip Content-Type as it's set by media type)
                 headers.forEach { (key, value) ->
